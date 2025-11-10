@@ -41,3 +41,9 @@ yarn-error.log*
 # .nyc_output/
 .next/
 .nuxt/
+/src/generated/prisma
+
+/src/generated/prisma
+
+# clerk configuration (can include secrets)
+/.clerk/
