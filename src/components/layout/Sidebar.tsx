@@ -2,13 +2,30 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { Home, BarChart2, Users, CreditCard, CalendarDays, LogOut, Trello, ChevronRight, Menu, AlertTriangle, Briefcase, DollarSign, Eye, FolderKanban, ClipboardCheck } from "lucide-react";
+import {
+  Home,
+  BarChart2,
+  Users,
+  CreditCard,
+  CalendarDays,
+  Trello,
+  ChevronRight,
+  Menu,
+  AlertTriangle,
+  Briefcase,
+  DollarSign,
+  Eye,
+  FolderKanban,
+  ClipboardCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
+import { useUser, UserButton } from "@clerk/nextjs";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
-  const { currentUser, roleAccess } = useApp();
+  const { user } = useUser(); // Clerk user
+  const { roleAccess } = useApp();
 
   const navItems = [
     { label: "Dashboard", href: "/", icon: <Home size={18} /> },
@@ -23,7 +40,7 @@ export default function Sidebar() {
     { label: "Admin Notices", href: "/admin/notices", icon: <AlertTriangle size={18} />, access: roleAccess.canManageTeam },
     { label: "Team", href: "/admin/team", icon: <Briefcase size={18} />, access: roleAccess.canManageTeam },
     { label: "Finance", href: "/admin/finance", icon: <DollarSign size={18} />, access: roleAccess.canManageTeam },
-    { label: "Classified", href: "/classified", icon: <Eye size={18} />, access: roleAccess.canManageTeam }
+    { label: "Classified", href: "/classified", icon: <Eye size={18} />, access: roleAccess.canManageTeam },
   ];
 
   return (
@@ -50,32 +67,43 @@ export default function Sidebar() {
             className="fixed left-0 top-0 h-full w-64 bg-card border-r shadow-2xl z-40 flex flex-col justify-between"
           >
             <div className="p-5 mt-12 space-y-8">
-              <h2 className="text-xl font-bold tracking-tight text-primary">TaskNity.Work</h2>
+              <h2 className="text-xl font-bold tracking-tight text-primary">
+                TaskNity.Work
+              </h2>
 
               <nav className="flex flex-col space-y-2">
-                {navItems.filter(item => item.access !== false).map((item) => (
-                  <Link key={item.href} href={item.href} passHref>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 text-sm font-medium hover:bg-muted"
-                      onClick={() => setOpen(false)}
-                    >
-                      {item.icon}
-                      {item.label}
-                    </Button>
-                  </Link>
-                ))}
+                {navItems
+                  .filter((item) => item.access !== false)
+                  .map((item) => (
+                    <Link key={item.href} href={item.href} passHref>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 text-sm font-medium hover:bg-muted"
+                        onClick={() => setOpen(false)}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </Button>
+                    </Link>
+                  ))}
               </nav>
             </div>
 
+            {/* --- User Info and Clerk Button --- */}
             <div className="p-4 border-t flex items-center gap-3">
-               <div className="flex-grow">
-                 <p className="text-sm font-semibold">{currentUser?.name}</p>
-                 <p className="text-xs text-muted-foreground">{currentUser?.role}</p>
-               </div>
-              <Button variant="outline" size="icon">
-                <LogOut size={16} />
-              </Button>
+              <div className="flex-grow">
+                <p className="text-sm font-semibold">
+                  {user?.firstName
+                    ? `${user.firstName} ${user.lastName ?? ""}`
+                    : "User"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {user?.primaryEmailAddress?.emailAddress ?? ""}
+                </p>
+              </div>
+
+              {/* Clerk UserButton handles Sign Out / Profile */}
+              <UserButton afterSignOutUrl="/" />
             </div>
           </motion.aside>
         )}
