@@ -10,15 +10,15 @@ export async function GET(req: Request) {
     const { sessionClaims } = await auth();
     const userRole = (sessionClaims?.metadata as any)?.role;
 
-    if (userRole !== "ADMIN") {
+    if (userRole !== "ADMIN" && userRole !== "FINANCE") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const leaveRequests = await prisma.leave.findMany();
+    const invoices = await prisma.invoice.findMany();
 
-    return NextResponse.json(leaveRequests);
+    return NextResponse.json(invoices);
   } catch (error) {
-    console.error("Error fetching leave requests:", error);
+    console.error("Error fetching invoices:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -28,33 +28,34 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { sessionClaims } = await auth();
+    const userRole = (sessionClaims?.metadata as any)?.role;
+
+    if (userRole !== "ADMIN" && userRole !== "FINANCE") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const { startDate, endDate, reason } = await req.json();
+    const { projectId, amount, dueDate } = await req.json();
 
-    if (!startDate || !endDate || !reason) {
+    if (!projectId || !amount || !dueDate) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const newLeaveRequest = await prisma.leave.create({
+    const newInvoice = await prisma.invoice.create({
       data: {
-        userId,
-        startDate,
-        endDate,
-        reason,
+        projectId,
+        amount,
+        dueDate,
         status: "PENDING",
       },
     });
 
-    return NextResponse.json(newLeaveRequest, { status: 201 });
+    return NextResponse.json(newInvoice, { status: 201 });
   } catch (error) {
-    console.error("Error creating leave request:", error);
+    console.error("Error creating invoice:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

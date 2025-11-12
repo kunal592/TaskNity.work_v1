@@ -12,13 +12,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const leaveRequests = await prisma.leave.findMany({
+    const expenses = await prisma.expense.findMany({
       where: { userId },
     });
 
-    return NextResponse.json(leaveRequests);
+    return NextResponse.json(expenses);
   } catch (error) {
-    console.error("Error fetching user leave requests:", error);
+    console.error("Error fetching user expenses:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

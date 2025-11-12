@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 export async function PUT(
   req: Request,
-  { params }: { params: { leaveId: string } }
+  { params }: { params: { expenseId: string } }
 ) {
   try {
     const { sessionClaims } = await auth();
@@ -26,14 +26,14 @@ export async function PUT(
       );
     }
 
-    const updatedLeaveRequest = await prisma.leave.update({
-      where: { id: params.leaveId },
+    const updatedExpense = await prisma.expense.update({
+      where: { id: params.expenseId },
       data: { status },
     });
 
-    return NextResponse.json(updatedLeaveRequest);
+    return NextResponse.json(updatedExpense);
   } catch (error) {
-    console.error("Error updating leave request:", error);
+    console.error("Error updating expense:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

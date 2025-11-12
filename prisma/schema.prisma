@@ -121,6 +121,7 @@ model User {
   reviewedExpenses Expense[]       @relation("ReviewedExpenses")
   invoices         Invoice[]
   aiLogs           AiLog[]
+  attendance       Attendance[]
 
   reviewedLeaves Leave[] @relation("ReviewedLeaves")
 
@@ -235,6 +236,17 @@ model TaskComment {
 }
 
 // -----------------------------------------
+
+model Attendance {
+  id        String    @id @default(uuid())
+  userId    String
+  checkIn   DateTime
+  checkOut  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("attendance")
+}
 
 model AttendanceLog {
   id           String           @id @default(uuid())

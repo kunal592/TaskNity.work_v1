@@ -14,11 +14,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const leaveRequests = await prisma.leave.findMany();
+    const expenses = await prisma.expense.findMany();
 
-    return NextResponse.json(leaveRequests);
+    return NextResponse.json(expenses);
   } catch (error) {
-    console.error("Error fetching leave requests:", error);
+    console.error("Error fetching expenses:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -33,28 +33,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { startDate, endDate, reason } = await req.json();
+    const { amount, description, projectId } = await req.json();
 
-    if (!startDate || !endDate || !reason) {
+    if (!amount || !description || !projectId) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const newLeaveRequest = await prisma.leave.create({
+    const newExpense = await prisma.expense.create({
       data: {
+        amount,
+        description,
+        projectId,
         userId,
-        startDate,
-        endDate,
-        reason,
         status: "PENDING",
       },
     });
 
-    return NextResponse.json(newLeaveRequest, { status: 201 });
+    return NextResponse.json(newExpense, { status: 201 });
   } catch (error) {
-    console.error("Error creating leave request:", error);
+    console.error("Error creating expense:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
