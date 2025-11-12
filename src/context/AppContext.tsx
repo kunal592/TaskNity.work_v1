@@ -1,27 +1,57 @@
 "use client";
 import type { Dispatch, SetStateAction } from 'react';
 import { createContext, useContext, useState, useEffect } from "react";
-import { users as mockUsers, projects as mockProjects, tasks as mockTasks, attendance as mockAttendance, expenses as mockExpenses, expenseCategories as mockExpenseCategories, leaves as mockLeaves } from "@/mock/data";
 import type { AppContextType, User, Project, Task, Attendance, Expense, Leave } from '@/types';
+import axios from 'axios';
 
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const role = "Member"; // Defaulting to 'Member' as role switcher is removed.
-  const [users] = useState<User[]>(mockUsers);
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [attendance, setAttendance] = useState<Attendance[]>(mockAttendance);
-  const [leaves, setLeaves] = useState<Leave[]>(mockLeaves);
-  const [expenses, setExpenses] = useState<Expense[]>(mockExpenses);
-  const [expenseCategories] = useState<string[]>(mockExpenseCategories);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [leaves, setLeaves] = useState<Leave[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    // Setting user based on the hardcoded role.
-    const userForRole = users.find(u => u.role === role);
-    setCurrentUser(userForRole || users.find(u => u.role === 'Member') || users[0] || null);
-  }, [users]);
+    const fetchData = async () => {
+      try {
+        const [
+          usersResponse,
+          projectsResponse,
+          tasksResponse,
+          attendanceResponse,
+          leavesResponse,
+          expensesResponse,
+          currentUserResponse,
+        ] = await Promise.all([
+          axios.get('/api/users'),
+          axios.get('/api/projects'),
+          axios.get('/api/tasks'),
+          axios.get('/api/attendance'),
+          axios.get('/api/leave'),
+          axios.get('/api/expenses'),
+          axios.get('/api/auth/me'),
+        ]);
+
+        setUsers(usersResponse.data);
+        setProjects(projectsResponse.data);
+        setTasks(tasksResponse.data);
+        setAttendance(attendanceResponse.data);
+        setLeaves(leavesResponse.data);
+        setExpenses(expensesResponse.data);
+        setCurrentUser(currentUserResponse.data);
+        
+      } catch (error) {
+        console.error("Failed to fetch initial data", error);
+      }
+    };
+
+    fetchData();
+  }, []);
   
   const markAttendance = (status: Attendance['status']) => {
     const today = new Date().toISOString().split("T")[0];
