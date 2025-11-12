@@ -4,11 +4,11 @@ import { NextResponse } from "next/server";
 // Define routes that require admin access
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
-export default clerkMiddleware((auth, req) => {
-  const { userId, sessionClaims } = auth();
+export default clerkMiddleware(async (auth, req) => {
+  const { userId, sessionClaims } = await auth();
 
   // Get user role from session claims
-  const userRole = sessionClaims?.metadata.role;
+  const userRole = (sessionClaims?.metadata as any)?.role;
 
   // If the user is trying to access an admin route
   if (isAdminRoute(req)) {
