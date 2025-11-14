@@ -1,9 +1,8 @@
+// src/app/api/webhooks/clerk/route.ts
 import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/db";
 
 export async function POST(req: Request) {
   const payload = await req.text();
@@ -17,7 +16,6 @@ export async function POST(req: Request) {
   const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
 
   let event;
-
   try {
     event = wh.verify(payload, svixHeaders) as any;
   } catch (err) {
@@ -26,7 +24,7 @@ export async function POST(req: Request) {
 
   const { type, data } = event;
 
-  // Auto-create user
+  // Auto-create user on user.created
   if (type === "user.created") {
     await prisma.user.create({
       data: {

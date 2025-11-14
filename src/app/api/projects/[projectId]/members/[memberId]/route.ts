@@ -1,35 +1,23 @@
+// src/app/api/projects/[projectId]/members/[memberId]/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const PUT = withAuth(async (req: Request, { params }: any) => {
+  await requirePermission(req, "project:member:update");
+  const { roleInProject } = await req.json();
+  if (!roleInProject) return new Response(JSON.stringify({ error: "Missing roleInProject" }), { status: 400 });
 
-const prisma = new PrismaClient();
+  const updated = await prisma.projectMember.update({
+    where: { id: params.memberId },
+    data: { roleInProject },
+  });
 
-export async function DELETE(
-  req: Request,
-  { params }: { params: { projectId: string; memberId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
+  return updated;
+});
 
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    await prisma.projectMember.deleteMany({
-      where: { 
-        projectId: params.projectId,
-        userId: params.memberId
-       },
-    });
-
-    return NextResponse.json({ message: "Project member removed successfully" });
-  } catch (error) {
-    console.error("Error removing project member:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+export const DELETE = withAuth(async (req: Request, { params }: any) => {
+  await requirePermission(req, "project:member:update");
+  await prisma.projectMember.delete({ where: { id: params.memberId } });
+  return { message: "Member removed" };
+});

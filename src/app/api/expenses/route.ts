@@ -1,60 +1,37 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+// src/app/api/expenses/route.ts
+import { withAuth } from "@/lib/withAuth";
 import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-export async function GET(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
+export const GET = withAuth(async (req: Request) => {
+  // management of all expenses requires expenses:read
+  await requirePermission(req, "expenses:read");
 
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+  const expenses = await prisma.expense.findMany();
+  return expenses;
+});
 
-    const expenses = await prisma.expense.findMany();
+export const POST = withAuth(async (req: Request) => {
+  // create own expense
+  const { user } = await requirePermission(req, "expenses:create");
 
-    return NextResponse.json(expenses);
-  } catch (error) {
-    console.error("Error fetching expenses:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+  const { amount, description, projectId, category, receiptUrl } = await req.json();
+
+  if (!amount || !description || !projectId) {
+    return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
   }
-}
 
-export async function POST(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const newExpense = await prisma.expense.create({
+    data: {
+      userId: user.id,
+      amount,
+      description,
+      projectId,
+      status: "PENDING",
+      category: category ?? undefined,
+      receiptUrl: receiptUrl ?? undefined,
+    },
+  });
 
-    const { amount, description, projectId } = await req.json();
-
-    if (!amount || !description || !projectId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newExpense = await prisma.expense.create({
-      data: {
-        amount,
-        description,
-        projectId,
-        userId,
-        status: "PENDING",
-      },
-    });
-
-    return NextResponse.json(newExpense, { status: 201 });
-  } catch (error) {
-    console.error("Error creating expense:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  return newExpense;
+});

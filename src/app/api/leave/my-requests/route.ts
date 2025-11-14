@@ -1,27 +1,10 @@
+// src/app/api/leave/my-requests/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function GET(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const leaveRequests = await prisma.leave.findMany({
-      where: { userId },
-    });
-
-    return NextResponse.json(leaveRequests);
-  } catch (error) {
-    console.error("Error fetching user leave requests:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+export const GET = withAuth(async (req: Request) => {
+  const { user } = await requirePermission(req, "leave:my");
+  const leaveRequests = await prisma.leave.findMany({ where: { userId: user.id } });
+  return leaveRequests;
+});

@@ -1,42 +1,19 @@
+// src/app/api/tasks/[taskId]/assign/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const POST = withAuth(async (req: Request, { params }: any) => {
+  // assign requires task:assign
+  await requirePermission(req, "task:assign");
+  const { userId } = await req.json();
 
-const prisma = new PrismaClient();
+  if (!userId) return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
 
-export async function POST(
-  req: Request,
-  { params }: { params: { taskId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
+  const updatedTask = await prisma.task.update({
+    where: { id: params.taskId },
+    data: { /* original uses assigneeId field - preserve */ assigneeId: userId },
+  });
 
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const { userId } = await req.json();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const updatedTask = await prisma.task.update({
-      where: { id: params.taskId },
-      data: { assigneeId: userId },
-    });
-
-    return NextResponse.json(updatedTask);
-  } catch (error) {
-    console.error("Error assigning task:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  return updatedTask;
+});

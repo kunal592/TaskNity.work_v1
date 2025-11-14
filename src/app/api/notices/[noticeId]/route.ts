@@ -1,62 +1,27 @@
+// src/app/api/notices/[noticeId]/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const PUT = withAuth(async (req: Request, { params }: any) => {
+  await requirePermission(req, "notice:update");
+  const updatedData = await req.json();
 
-const prisma = new PrismaClient();
+  const updatedNotice = await prisma.notice.update({
+    where: { id: params.noticeId },
+    data: updatedData,
+  });
 
-export async function PUT(
-  req: Request,
-  { params }: { params: { noticeId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
+  return updatedNotice;
+});
 
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+export const DELETE = withAuth(async (req: Request, { params }: any) => {
+  await requirePermission(req, "notice:delete");
 
-    const { ...updatedData } = await req.json();
+  const updatedNotice = await prisma.notice.update({
+    where: { id: params.noticeId },
+    data: { isActive: false },
+  });
 
-    const updatedNotice = await prisma.notice.update({
-      where: { id: params.noticeId },
-      data: updatedData,
-    });
-
-    return NextResponse.json(updatedNotice);
-  } catch (error) {
-    console.error("Error updating notice:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  req: Request,
-  { params }: { params: { noticeId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const updatedNotice = await prisma.notice.update({
-      where: { id: params.noticeId },
-      data: { isActive: false },
-    });
-
-    return NextResponse.json(updatedNotice);
-  } catch (error) {
-    console.error("Error deactivating notice:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  return updatedNotice;
+});

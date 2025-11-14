@@ -1,7 +1,6 @@
+// src/lib/auth.ts
 import { currentUser } from "@clerk/nextjs/server";
-import { PrismaClient, UserRole } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "./db";
 
 /**
  * Ensures user is authenticated and synced in DB.
@@ -24,7 +23,7 @@ export async function requireAuth() {
         email: clerk.emailAddresses?.[0]?.emailAddress || "",
         name: `${clerk.firstName || ""} ${clerk.lastName || ""}`,
         avatarUrl: clerk.imageUrl,
-        role: UserRole.VIEWER,
+        role: "VIEWER",
       },
     });
   }
@@ -35,7 +34,7 @@ export async function requireAuth() {
 /**
  * Ensures user has the required role(s)
  */
-export async function requireRole(allowed: UserRole[]) {
+export async function requireRole(allowed: string[]) {
   const user = await requireAuth();
 
   if (!allowed.includes(user.role)) {

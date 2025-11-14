@@ -1,79 +1,63 @@
+// src/app/api/tasks/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const GET = withAuth(async (req: Request) => {
+  await requirePermission(req, "task:read");
+  const { searchParams } = new URL(req.url);
+  const projectId = searchParams.get("projectId");
 
-const prisma = new PrismaClient();
+  const tasks = await prisma.task.findMany({
+    where: {
+      ...(projectId && { projectId }),
+    },
+  });
 
-export async function GET(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
+  return tasks;
+});
 
-    const tasks = await prisma.task.findMany({
-      where: {
-        ...(projectId && { projectId }),
-      },
-    });
+export const POST = withAuth(async (req: Request) => {
+  await requirePermission(req, "task:create");
+  const {
+    title,
+    description,
+    projectId,
+    status,
+    priority,
+    dueDate,
+    assigneeId,
+  } = await req.json();
 
-    return NextResponse.json(tasks);
-  } catch (error) {
-    console.error("Error fetching tasks:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+  if (!title || !description || !projectId) {
+    return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
   }
-}
 
-export async function POST(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
+  const { user } = await requirePermission(req, "task:create");
 
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const {
+  const newTask = await prisma.task.create({
+    data: {
       title,
       description,
       projectId,
       status,
       priority,
-      dueDate,
-      assigneeId,
-    } = await req.json();
+      deadline: dueDate ? new Date(dueDate) : undefined,
+      createdBy: user.id,
+      published: true,
+    },
+  });
 
-    if (!title || !description || !projectId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+  // create assignee record if provided
+  if (assigneeId) {
+    try {
+      await prisma.taskAssignee.create({
+        data: { taskId: newTask.id, userId: assigneeId },
+      });
+    } catch (e) {
+      console.warn("Could not add assignee:", e);
     }
-
-    const newTask = await prisma.task.create({
-      data: {
-        title,
-        description,
-        projectId,
-        status,
-        priority,
-        dueDate,
-        assigneeId,
-      },
-    });
-
-    return NextResponse.json(newTask, { status: 201 });
-  } catch (error) {
-    console.error("Error creating task:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
   }
-}
+
+  return newTask;
+});

@@ -1,43 +1,24 @@
+// src/app/api/tasks/[taskId]/comments/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const POST = withAuth(async (req: Request, { params }: any) => {
+  // any authenticated user who can comment
+  await requirePermission(req, "task:comment");
+  const { text } = await req.json();
 
-const prisma = new PrismaClient();
+  if (!text) return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
 
-export async function POST(
-  req: Request,
-  { params }: { params: { taskId: string } }
-) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const { user } = await requirePermission(req, "task:comment");
 
-    const { text } = await req.json();
+  const newComment = await prisma.taskComment.create({
+    data: {
+      text,
+      taskId: params.taskId,
+      userId: user.id,
+    },
+  });
 
-    if (!text) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newComment = await prisma.comment.create({
-      data: {
-        text,
-        taskId: params.taskId,
-        userId,
-      },
-    });
-
-    return NextResponse.json(newComment, { status: 201 });
-  } catch (error) {
-    console.error("Error adding comment:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  return newComment;
+});

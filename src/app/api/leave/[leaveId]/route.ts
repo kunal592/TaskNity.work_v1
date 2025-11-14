@@ -1,42 +1,25 @@
+// src/app/api/leave/[leaveId]/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const PUT = withAuth(async (req: Request, { params }: any) => {
+  // approval requires leave:review
+  const { user } = await requirePermission(req, "leave:review");
 
-const prisma = new PrismaClient();
-
-export async function PUT(
-  req: Request,
-  { params }: { params: { leaveId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const { status } = await req.json();
-
-    if (!status || !["APPROVED", "REJECTED"].includes(status)) {
-      return NextResponse.json(
-        { error: "Invalid status" },
-        { status: 400 }
-      );
-    }
-
-    const updatedLeaveRequest = await prisma.leave.update({
-      where: { id: params.leaveId },
-      data: { status },
-    });
-
-    return NextResponse.json(updatedLeaveRequest);
-  } catch (error) {
-    console.error("Error updating leave request:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+  const { status } = await req.json();
+  if (!status || !["APPROVED", "REJECTED"].includes(status)) {
+    return new Response(JSON.stringify({ error: "Invalid status" }), { status: 400 });
   }
-}
+
+  const updatedLeaveRequest = await prisma.leave.update({
+    where: { id: params.leaveId },
+    data: {
+      status,
+      reviewedBy: user.id,
+      reviewedAt: new Date(),
+    },
+  });
+
+  return updatedLeaveRequest;
+});

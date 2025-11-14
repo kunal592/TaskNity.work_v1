@@ -1,60 +1,28 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+// src/app/api/notices/route.ts
+import { withAuth } from "@/lib/withAuth";
 import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-export async function GET(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const GET = withAuth(async (req: Request) => {
+  await requirePermission(req, "notice:read");
+  const notices = await prisma.notice.findMany({ where: { isActive: true } });
+  return notices;
+});
 
-    const notices = await prisma.notice.findMany({
-      where: { isActive: true },
-    });
+export const POST = withAuth(async (req: Request) => {
+  await requirePermission(req, "notice:create");
+  const { title, content } = await req.json();
+  if (!title || !content) return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
 
-    return NextResponse.json(notices);
-  } catch (error) {
-    console.error("Error fetching notices:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  const { user } = await requirePermission(req, "notice:create"); // get user for createdBy
 
-export async function POST(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
+  const newNotice = await prisma.notice.create({
+    data: {
+      title,
+      content,
+      createdBy: user.id,
+    },
+  });
 
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const { title, content } = await req.json();
-
-    if (!title || !content) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newNotice = await prisma.notice.create({
-      data: {
-        title,
-        content,
-        createdBy: (await auth()).userId!,
-      },
-    });
-
-    return NextResponse.json(newNotice, { status: 201 });
-  } catch (error) {
-    console.error("Error creating notice:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  return newNotice;
+});

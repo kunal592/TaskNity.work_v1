@@ -1,39 +1,29 @@
+// src/app/api/webhooks/clerk/test-create/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
-const prisma = new PrismaClient();
-
+/**
+ * small test endpoint to create a fake user during development
+ * Protect this route with middleware or remove in production.
+ */
 export async function POST(req: Request) {
-  // Safety: only allow in non-production
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not allowed in production" }, { status: 403 });
-  }
-
   try {
     const body = await req.json();
-    const { id: clerkId, name, email, role } = body;
+    const { email, firstName, lastName, role } = body ?? {};
+    if (!email) return NextResponse.json({ error: "Missing email" }, { status: 400 });
 
-    if (!clerkId || !email) {
-      return NextResponse.json({ error: "Missing clerkId or email" }, { status: 400 });
-    }
-
-    const existing = await prisma.user.findUnique({ where: { clerkId } });
-    if (existing) {
-      return NextResponse.json({ error: "User already exists", user: existing }, { status: 409 });
-    }
-
-    const created = await prisma.user.create({
+    const u = await prisma.user.create({
       data: {
-        clerkId,
-        name: name || undefined,
+        clerkId: `dev-${Date.now()}`,
         email,
-        role: (role || "MEMBER") as any,
+        name: `${firstName ?? ""} ${lastName ?? ""}`.trim() || null,
+        role: (role as any) ?? "MEMBER",
       },
     });
 
-    return NextResponse.json({ status: "created", user: created });
-  } catch (err) {
-    console.error("test-create webhook error:", err);
+    return NextResponse.json(u, { status: 201 });
+  } catch (e) {
+    console.error(e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

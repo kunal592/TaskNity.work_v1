@@ -1,27 +1,13 @@
+// src/app/api/attendance/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const GET = withAuth(async (req: Request) => {
+  // require attendance:read (ADMIN/MANAGER per RBAC)
+  await requirePermission(req, "attendance:read");
 
-const prisma = new PrismaClient();
+  const attendanceRecords = await prisma.attendance.findMany();
 
-export async function GET(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const attendanceRecords = await prisma.attendance.findMany();
-
-    return NextResponse.json(attendanceRecords);
-  } catch (error) {
-    console.error("Error fetching attendance records:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
+  return attendanceRecords;
+});

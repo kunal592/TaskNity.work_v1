@@ -1,48 +1,26 @@
+// src/app/api/attendance/check-out/route.ts
+import { withAuth } from "@/lib/withAuth";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/requirePermission";
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
+export const POST = withAuth(async (req: Request) => {
+  // require checkout permission (members and above)
+  const { user } = await requirePermission(req, "attendance:checkout");
 
-const prisma = new PrismaClient();
+  // find last open checkin (without checkOut)
+  const last = await prisma.attendance.findFirst({
+    where: { userId: user.id, checkOut: null },
+    orderBy: { checkIn: "desc" },
+  });
 
-export async function POST(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const existingAttendance = await prisma.attendance.findFirst({
-      where: {
-        userId,
-        checkIn: {
-          gte: today,
-        },
-        checkOut: null,
-      },
-    });
-
-    if (!existingAttendance) {
-      return NextResponse.json(
-        { error: "No active check-in found for today" },
-        { status: 400 }
-      );
-    }
-
-    const updatedAttendance = await prisma.attendance.update({
-      where: { id: existingAttendance.id },
-      data: { checkOut: new Date() },
-    });
-
-    return NextResponse.json(updatedAttendance);
-  } catch (error) {
-    console.error("Error recording check-out:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+  if (!last) {
+    return new Response(JSON.stringify({ error: "No active check-in found" }), { status: 400 });
   }
-}
+
+  const updated = await prisma.attendance.update({
+    where: { id: last.id },
+    data: { checkOut: new Date() },
+  });
+
+  return updated;
+});
