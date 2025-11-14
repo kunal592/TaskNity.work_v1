@@ -1,12 +1,4 @@
-# this is my current full endpoints api
-
-## dont remove any feature i want to have complete working things, this is in respect to frontend
-
-
-
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/prisma
+// prisma/schema.prisma
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
@@ -125,8 +117,8 @@ model User {
   invoices         Invoice[]
   aiLogs           AiLog[]
   attendance       Attendance[]
-
-  reviewedLeaves Leave[] @relation("ReviewedLeaves")
+  ledProjects      Project[]       @relation("ProjectLead")
+  reviewedLeaves   Leave[]         @relation("ReviewedLeaves")
 
   taskComments TaskComment[]
 
@@ -151,7 +143,8 @@ model Session {
 
 model Project {
   id          String        @id @default(uuid())
-  title       String
+  title       String?
+  name        String // added to align with API payloads that send `name`
   description String?
   progress    Int           @default(0)
   isPublic    Boolean       @default(false)
@@ -159,10 +152,18 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  // Additional fields used by your routes
+  startDate DateTime?
+  endDate   DateTime?
+
   // Relations
   members  ProjectMember[]
   tasks    Task[]
   invoices Invoice[]
+
+  // relation back to lead (optional)
+  leadId String?
+  lead   User?   @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
 
   @@map("projects")
 }
@@ -241,10 +242,10 @@ model TaskComment {
 // -----------------------------------------
 
 model Attendance {
-  id        String    @id @default(uuid())
-  userId    String
-  checkIn   DateTime
-  checkOut  DateTime?
+  id       String    @id @default(uuid())
+  userId   String
+  checkIn  DateTime
+  checkOut DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -358,73 +359,8 @@ model AiLog {
 
 
 
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/attendance/check-in/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function POST(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const newAttendance = await prisma.attendance.create({
-      data: {
-        userId,
-        checkIn: new Date(),
-      },
-    });
-
-    return NextResponse.json(newAttendance, { status: 201 });
-  } catch (error) {
-    console.error("Error recording check-in:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/attendance/route.ts
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/db";
-
-export async function GET(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const attendance = await prisma.attendance.findMany();
-
-    return NextResponse.json(attendance);
-  } catch (error) {
-    console.error("Error fetching attendance:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/auth/me/route.ts
-
-
+## src/app/api/auth/me/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -480,9 +416,10 @@ export async function GET(req: Request) {
     );
   }
 }
+```
 
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/expenses/[expenseId]/route.ts
-
+## src/app/api/expenses/[expenseId]/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -524,12 +461,10 @@ export async function PUT(
     );
   }
 }
+```
 
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/expenses/my-requests/route.ts
-
-
+## src/app/api/expenses/my-requests/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -556,144 +491,10 @@ export async function GET(req: Request) {
     );
   }
 }
+```
 
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/expenses/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/db";
-
-export async function GET(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const expenses = await prisma.expense.findMany();
-
-    return NextResponse.json(expenses);
-  } catch (error) {
-    console.error("Error fetching expenses:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { amount, description, projectId } = await req.json();
-
-    if (!amount || !description || !projectId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newExpense = await prisma.expense.create({
-      data: {
-        amount,
-        description,
-        projectId,
-        userId,
-        status: "PENDING",
-      },
-    });
-
-    return NextResponse.json(newExpense, { status: 201 });
-  } catch (error) {
-    console.error("Error creating expense:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/invoices/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function GET(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "FINANCE") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const invoices = await prisma.invoice.findMany();
-
-    return NextResponse.json(invoices);
-  } catch (error) {
-    console.error("Error fetching invoices:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "FINANCE") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const { projectId, amount, dueDate } = await req.json();
-
-    if (!projectId || !amount || !dueDate) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newInvoice = await prisma.invoice.create({
-      data: {
-        projectId,
-        amount,
-        dueDate,
-        status: "PENDING",
-      },
-    });
-
-    return NextResponse.json(newInvoice, { status: 201 });
-  } catch (error) {
-    console.error("Error creating invoice:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-src/app/api/leave/[leaveId]/route.ts
-
-
+## src/app/api/leave/[leaveId]/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -735,11 +536,10 @@ export async function PUT(
     );
   }
 }
+```
 
-
-src/app/api/leave/my-requests/route.ts
-
-
+## src/app/api/leave/my-requests/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -766,75 +566,10 @@ export async function GET(req: Request) {
     );
   }
 }
+```
 
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/leave/route.ts
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/db";
-
-export async function GET(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const leaveRequests = await prisma.leave.findMany();
-
-    return NextResponse.json(leaveRequests);
-  } catch (error) {
-    console.error("Error fetching leave requests:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { startDate, endDate, reason } = await req.json();
-
-    if (!startDate || !endDate || !reason) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newLeaveRequest = await prisma.leave.create({
-      data: {
-        userId,
-        startDate,
-        endDate,
-        reason,
-        status: "PENDING",
-      },
-    });
-
-    return NextResponse.json(newLeaveRequest, { status: 201 });
-  } catch (error) {
-    console.error("Error creating leave request:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-src/app/api/notices/[noticeId]/route.ts
-
-
+## src/app/api/notices/[noticeId]/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -896,187 +631,10 @@ export async function DELETE(
     );
   }
 }
+```
 
-
-src/app/api/notices/route.ts
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/db";
-
-export async function GET(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const notices = await prisma.notice.findMany({
-      where: { isActive: true },
-    });
-
-    return NextResponse.json(notices);
-  } catch (error) {
-    console.error("Error fetching notices:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const { title, content } = await req.json();
-
-    if (!title || !content) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newNotice = await prisma.notice.create({
-      data: {
-        title,
-        content,
-        createdBy: (await auth()).userId!,
-      },
-    });
-
-    return NextResponse.json(newNotice, { status: 201 });
-  } catch (error) {
-    console.error("Error creating notice:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-src/app/api/projects/[projectId]/members/[memberId]/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function DELETE(
-  req: Request,
-  { params }: { params: { projectId: string; memberId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    await prisma.projectMember.deleteMany({
-      where: { 
-        projectId: params.projectId,
-        userId: params.memberId
-       },
-    });
-
-    return NextResponse.json({ message: "Project member removed successfully" });
-  } catch (error) {
-    console.error("Error removing project member:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/projects/[projectId]/members/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function GET(
-  req: Request,
-  { params }: { params: { projectId: string } }
-) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const members = await prisma.projectMember.findMany({
-      where: { projectId: params.projectId },
-      include: { user: true },
-    });
-
-    return NextResponse.json(members);
-  } catch (error) {
-    console.error("Error fetching project members:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(
-  req: Request,
-  { params }: { params: { projectId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const { userId, role } = await req.json();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    if (!userId || !role) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newMember = await prisma.projectMember.create({
-      data: {
-        projectId: params.projectId,
-        userId,
-        role,
-      },
-    });
-
-    return NextResponse.json(newMember, { status: 201 });
-  } catch (error) {
-    console.error("Error adding project member:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/projects/[projectId]/route.ts
-
-
+## src/app/api/projects/[projectId]/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -1164,172 +722,10 @@ export async function DELETE(
     );
   }
 }
+```
 
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/projects/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function GET(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const projects = await prisma.project.findMany();
-
-    return NextResponse.json(projects);
-  } catch (error) {
-    console.error("Error fetching projects:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const { name, description, leadId, startDate, endDate, status } = await req.json();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    if (!name || !description || !leadId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newProject = await prisma.project.create({
-      data: {
-        name,
-        description,
-        leadId,
-        startDate,
-        endDate,
-        status,
-      },
-    });
-
-    return NextResponse.json(newProject, { status: 201 });
-  } catch (error) {
-    console.error("Error creating project:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/tasks/[taskId]/assign/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function POST(
-  req: Request,
-  { params }: { params: { taskId: string } }
-) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const { userId } = await req.json();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const updatedTask = await prisma.task.update({
-      where: { id: params.taskId },
-      data: { assigneeId: userId },
-    });
-
-    return NextResponse.json(updatedTask);
-  } catch (error) {
-    console.error("Error assigning task:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/tasks/[taskId]/comments/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function POST(
-  req: Request,
-  { params }: { params: { taskId: string } }
-) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { text } = await req.json();
-
-    if (!text) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newComment = await prisma.comment.create({
-      data: {
-        text,
-        taskId: params.taskId,
-        userId,
-      },
-    });
-
-    return NextResponse.json(newComment, { status: 201 });
-  } catch (error) {
-    console.error("Error adding comment:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/tasks/[taskId]/route.ts
-
-
+## src/app/api/tasks/[taskId]/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -1418,93 +814,10 @@ export async function DELETE(
     );
   }
 }
+```
 
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/tasks/route.ts
-
-
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-export async function GET(req: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
-
-    const tasks = await prisma.task.findMany({
-      where: {
-        ...(projectId && { projectId }),
-      },
-    });
-
-    return NextResponse.json(tasks);
-  } catch (error) {
-    console.error("Error fetching tasks:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { sessionClaims } = await auth();
-    const userRole = (sessionClaims?.metadata as any)?.role;
-
-    if (userRole !== "ADMIN" && userRole !== "LEAD") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    const {
-      title,
-      description,
-      projectId,
-      status,
-      priority,
-      dueDate,
-      assigneeId,
-    } = await req.json();
-
-    if (!title || !description || !projectId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const newTask = await prisma.task.create({
-      data: {
-        title,
-        description,
-        projectId,
-        status,
-        priority,
-        dueDate,
-        assigneeId,
-      },
-    });
-
-    return NextResponse.json(newTask, { status: 201 });
-  } catch (error) {
-    console.error("Error creating task:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/users/[userId]/route.ts
-
+## src/app/api/users/[userId]/route.ts
+```typescript
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
@@ -1592,11 +905,12 @@ export async function DELETE(
     );
   }
 }
+```
 
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/users/route.ts
-
+## src/app/api/attendance/route.ts
+```typescript
 import { NextResponse } from "next/server";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -1604,16 +918,45 @@ const prisma = new PrismaClient();
 export async function GET(req: Request) {
   try {
     const { sessionClaims } = await auth();
+    const userRole = (sessionClaims?.metadata as any)?.role;
 
-    if ((sessionClaims?.metadata as any)?.role !== "ADMIN") {
+    if (userRole !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const users = await prisma.user.findMany();
+    const attendanceRecords = await prisma.attendance.findMany();
 
-    return NextResponse.json(users);
+    return NextResponse.json(attendanceRecords);
   } catch (error) {
-    console.error("Error fetching users:", error);
+    console.error("Error fetching attendance records:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## src/app/api/notices/route.ts
+```typescript
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/db";
+
+export async function GET(req: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const notices = await prisma.notice.findMany({
+      where: { isActive: true },
+    });
+
+    return NextResponse.json(notices);
+  } catch (error) {
+    console.error("Error fetching notices:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -1624,40 +967,177 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const { sessionClaims } = await auth();
+    const userRole = (sessionClaims?.metadata as any)?.role;
 
-    if ((sessionClaims?.metadata as any)?.role !== "ADMIN") {
+    if (userRole !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const { email, name, role, position, department, team } = await req.json();
+    const { title, content } = await req.json();
 
-    if (!email || !name || !role) {
+    if (!title || !content) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const clerk = await clerkClient();
-    const clerkUser = await clerk.users.createUser({
-        emailAddress: [email],
-    });
-
-    const newUser = await prisma.user.create({
+    const newNotice = await prisma.notice.create({
       data: {
-        clerkId: clerkUser.id,
-        email,
-        name,
-        role,
-        position,
-        department,
-        team,
+        title,
+        content,
+        createdBy: (await auth()).userId!,
       },
     });
 
-    return NextResponse.json(newUser, { status: 201 });
+    return NextResponse.json(newNotice, { status: 201 });
   } catch (error) {
-    console.error("Error creating user:", error);
+    console.error("Error creating notice:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## src/app/api/projects/route.ts
+```typescript
+// src/app/api/projects/route.ts
+import { NextResponse } from "next/server";
+import { getAuth, auth } from "@clerk/nextjs/server";
+import { PrismaClient } from "@prisma/client";
+
+const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") (global as any).prisma = prisma;
+
+async function getCurrentDbUser(req: Request) {
+  let userId: string | undefined | null = undefined;
+  try {
+    // @ts-ignore
+    const authRes = getAuth ? getAuth(req) : undefined;
+    userId = authRes?.userId;
+  } catch (e) {}
+  try {
+    if (!userId) {
+      // @ts-ignore
+      const authRes2 = await auth();
+      userId = authRes2?.userId;
+    }
+  } catch (e) {}
+  if (!userId) return null;
+  const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
+  return dbUser;
+}
+
+export async function GET(req: Request) {
+  try {
+    const dbUser = await getCurrentDbUser(req);
+    if (!dbUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Everyone authenticated can list projects (you can tighten this later)
+    const projects = await prisma.project.findMany({
+      include: {
+        lead: {
+          select: { id: true, name: true, email: true, role: true }
+        },
+        members: {
+          select: { id: true, userId: true, roleInProject: true }
+        }
+      }
+    });
+
+    return NextResponse.json({ projects });
+  } catch (error) {
+    console.error("Error fetching projects:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const dbUser = await getCurrentDbUser(req);
+    if (!dbUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Authorize: only ADMINs or MEMBERs allowed to create projects (adjustable)
+    if (dbUser.role !== "ADMIN" && dbUser.role !== "MEMBER") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { name, description, leadId, startDate, endDate, status } = body ?? {};
+
+    if (!name) {
+      return NextResponse.json({ error: "Missing required fields: name" }, { status: 400 });
+    }
+
+    // convert start/end date if provided
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+
+    const newProject = await prisma.project.create({
+      data: {
+        name,
+        description: description ?? null,
+        leadId: leadId ?? null,
+        startDate: start ?? undefined,
+        endDate: end ?? undefined,
+        status: status ?? undefined,
+      },
+    });
+
+    // Optionally add the creator as a ProjectMember (as MEMBER)
+    try {
+      await prisma.projectMember.create({
+        data: {
+          projectId: newProject.id,
+          userId: dbUser.id,
+          roleInProject: "LEAD", // Make creator the lead for convenience; change if not desired
+        },
+      });
+    } catch (pmErr) {
+      // If duplicate or other error, log but do not fail project creation
+      console.warn("Could not create project member entry for creator:", pmErr);
+    }
+
+    return NextResponse.json(newProject, { status: 201 });
+  } catch (error) {
+    console.error("Error creating project:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+```
+
+## src/app/api/tasks/route.ts
+```typescript
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export async function GET(req: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { searchParams } = new URL(req.url);
+    const projectId = searchParams.get("projectId");
+
+    const tasks = await prisma.task.findMany({
+      where: {
+        ...(projectId && { projectId }),
+      },
+    });
+
+    return NextResponse.json(tasks);
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -1665,213 +1145,171 @@ export async function POST(req: Request) {
   }
 }
 
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/app/api/webhooks/clerk/route.ts
-
-import { headers } from "next/headers";
-import { Webhook } from "svix";
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
 export async function POST(req: Request) {
-  const payload = await req.text();
-  const headerPayload = await headers();
-  const svixHeaders = {
-    "svix-id": headerPayload.get("svix-id")!,
-    "svix-timestamp": headerPayload.get("svix-timestamp")!,
-    "svix-signature": headerPayload.get("svix-signature")!,
-  };
-
-  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
-
-  let event;
-
   try {
-    event = wh.verify(payload, svixHeaders) as any;
-  } catch (err) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-  }
+    const { sessionClaims } = await auth();
+    const userRole = (sessionClaims?.metadata as any)?.role;
 
-  const { type, data } = event;
+    if (userRole !== "ADMIN" && userRole !== "LEAD") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
 
-  // Auto-create user
-  if (type === "user.created") {
-    await prisma.user.create({
+    const {
+      title,
+      description,
+      projectId,
+      status,
+      priority,
+      dueDate,
+      assigneeId,
+    } = await req.json();
+
+    if (!title || !description || !projectId) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const newTask = await prisma.task.create({
       data: {
-        clerkId: data.id,
-        name: `${data.first_name || ""} ${data.last_name || ""}`.trim(),
-        email: data.email_addresses?.[0]?.email_address,
-        role: "MEMBER",
+        title,
+        description,
+        projectId,
+        status,
+        priority,
+        dueDate,
+        assigneeId,
       },
     });
-  }
 
-  return NextResponse.json({ status: "ok" });
-}
-
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/context/AppContext.tsx
-
-"use client";
-import type { Dispatch, SetStateAction } from 'react';
-import { createContext, useContext, useState, useEffect } from "react";
-import type { AppContextType, User, Project, Task, Attendance, Expense, Leave } from '@/types';
-import axios from 'axios';
-
-const AppContext = createContext<AppContextType | null>(null);
-
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [users, setUsers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [leaves, setLeaves] = useState<Leave[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
-
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const currentUserResponse = await axios.get('/api/auth/me');
-        const user = currentUserResponse.data;
-        setCurrentUser(user);
-        return user;
-      } catch (error) {
-        console.error("Failed to fetch current user", error);
-        // If we can't get the user, don't fetch other data
-        return null;
-      }
-    };
-
-    const fetchAllData = async (user: User) => {
-        try {
-            const dataRequests = [
-                axios.get('/api/projects'),
-                axios.get('/api/tasks'),
-                axios.get('/api/attendance'),
-                axios.get('/api/leave'),
-                axios.get('/api/expenses'),
-            ];
-
-            // Only fetch all users if the current user is an admin
-            if (user.role === 'Admin') {
-                dataRequests.unshift(axios.get('/api/users'));
-            } else {
-                // Otherwise, just populate the users array with the current user
-                setUsers([user]);
-            }
-
-            const responses = await Promise.all(dataRequests);
-
-            let responseIndex = 0;
-            if (user.role === 'Admin') {
-                setUsers(responses[responseIndex++].data);
-            }
-
-            setProjects(responses[responseIndex++].data);
-            setTasks(responses[responseIndex++].data);
-            setAttendance(responses[responseIndex++].data);
-            setLeaves(responses[responseIndex++].data);
-            setExpenses(responses[responseIndex++].data);
-        
-        } catch (error) {
-            console.error("Failed to fetch initial data", error);
-        }
-    };
-
-    const initialize = async () => {
-        const user = await fetchCurrentUser();
-        if (user) {
-            await fetchAllData(user);
-        }
-    }
-
-    initialize();
-  }, []);
-  
-  const markAttendance = (status: Attendance['status']) => {
-    const today = new Date().toISOString().split("T")[0];
-    if (!currentUser) return;
-
-    const existingEntry = attendance.find(
-      (a) => a.userId === currentUser.id && a.date === today
+    return NextResponse.json(newTask, { status: 201 });
+  } catch (error) {
+    console.error("Error creating task:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
     );
+  }
+}
+```
 
-    if (!existingEntry) {
-      const newAttendance: Attendance = {
-        id: `att-${Date.now()}`,
-        userId: currentUser.id,
-        date: today,
-        status,
-      };
-      setAttendance([...attendance, newAttendance]);
+## src/app/api/users/route.ts
+```typescript
+// src/app/api/users/route.ts
+import { NextResponse } from "next/server";
+import { clerkClient, getAuth, auth } from "@clerk/nextjs/server";
+import { PrismaClient } from "@prisma/client";
+
+const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") (global as any).prisma = prisma;
+
+/**
+ * Helper: get currently authenticated DB user (by clerkId)
+ */
+async function getCurrentDbUser(req: Request) {
+  // try getAuth(req) first (works in many Clerk setups), fallback to auth()
+  let userId: string | undefined | null = undefined;
+  try {
+    // getAuth may be sync
+    // @ts-ignore
+    const authRes = getAuth ? getAuth(req) : undefined;
+    userId = authRes?.userId;
+  } catch (e) {
+    // ignore
+  }
+
+  try {
+    if (!userId) {
+      // auth() returns a promise in some setups
+      // @ts-ignore
+      const authRes2 = await auth();
+      userId = authRes2?.userId;
     }
-  };
-
-  const roleAccess = {
-    canManageProjects: currentUser?.role === "Admin",
-    canManageTasks: currentUser ? ["Admin", "Member"].includes(currentUser.role) : false,
-    canViewAnalytics: currentUser ? ["Admin", "Member", "Viewer"].includes(currentUser.role) : false,
-    canManageTeam: currentUser?.role === "Admin",
-    canMarkAttendance: currentUser ? ["Admin", "Member"].includes(currentUser.role) : false,
-    canManageExpenses: currentUser?.role === "Admin",
-  };
-  
-  const value: AppContextType = {
-    currentUser,
-    users,
-    projects,
-    setProjects,
-    tasks,
-    setCurrentUser: (user: User | null) => setCurrentUser(user),
-    setTasks,
-    attendance,
-    markAttendance,
-    leaves,
-    setLeaves,
-    roleAccess,
-    expenses,
-    expenseCategories,
+  } catch (e) {
+    // ignore
   }
-  
-  return (
-    <AppContext.Provider value={value}>
-      {children}
-    </AppContext.Provider>
-  );
+
+  if (!userId) return null;
+  const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
+  return dbUser;
 }
 
-export function useApp() {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
+export async function GET(req: Request) {
+  try {
+    const dbUser = await getCurrentDbUser(req);
+    if (!dbUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (dbUser.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        clerkId: true,
+        email: true,
+        name: true,
+        role: true,
+        joinedAt: true,
+        team: true,
+      },
+    });
+
+    return NextResponse.json({ users });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-  return context;
 }
 
+export async function POST(req: Request) {
+  try {
+    const dbUser = await getCurrentDbUser(req);
+    if (!dbUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (dbUser.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-/Users/kunal/Desktop/Appnity_works_bin/TaskNity_work_v1/src/middleware.ts
+    const body = await req.json();
+    const { email, name, role, position, department, team } = body ?? {};
 
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+    if (!email || !name || !role) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
 
-const isPublicRoute = createRouteMatcher([
-  "/login",
-  "/register",
-]);
+    // Create user in Clerk
+        // clerkClient may be an async factory, call it to get the client instance
+        // Provide email in the shape Clerk expects
+        const clerk = await clerkClient();
+        const clerkUser = await clerk.users.createUser({
+          emailAddress: [email],
+          firstName: name,
+          publicMetadata: { role }, // optional: store role in Clerk public metadata as well
+        });
 
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, redirectToSignIn } = await auth();
+    // create DB record linking to clerkId
+    const newUser = await prisma.user.create({
+      data: {
+        clerkId: clerkUser.id,
+        email,
+        name,
+        // prisma enum accepts same string values (ADMIN/MEMBER/VIEWER)
+        role,
+        // optional extra fields
+        team: team ?? null,
+      },
+    });
 
-  if (!isPublicRoute(req) && !userId) {
-    return redirectToSignIn();
+    return NextResponse.json(newUser, { status: 201 });
+  } catch (error: any) {
+    console.error("Error creating user:", error);
+    // If Clerk returned a more descriptive error, show sanitized message
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-});
-
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
-};
-
-
+}
+```

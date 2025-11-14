@@ -1,6 +1,9 @@
+
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
@@ -11,11 +14,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const attendance = await prisma.attendance.findMany();
+    const attendanceRecords = await prisma.attendance.findMany();
 
-    return NextResponse.json(attendance);
+    return NextResponse.json(attendanceRecords);
   } catch (error) {
-    console.error("Error fetching attendance:", error);
+    console.error("Error fetching attendance records:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
