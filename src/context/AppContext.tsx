@@ -17,40 +17,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCurrentUser = async () => {
       try {
-        const [
-          usersResponse,
-          projectsResponse,
-          tasksResponse,
-          attendanceResponse,
-          leavesResponse,
-          expensesResponse,
-          currentUserResponse,
-        ] = await Promise.all([
-          axios.get('/api/users'),
-          axios.get('/api/projects'),
-          axios.get('/api/tasks'),
-          axios.get('/api/attendance'),
-          axios.get('/api/leave'),
-          axios.get('/api/expenses'),
-          axios.get('/api/auth/me'),
-        ]);
-
-        setUsers(usersResponse.data);
-        setProjects(projectsResponse.data);
-        setTasks(tasksResponse.data);
-        setAttendance(attendanceResponse.data);
-        setLeaves(leavesResponse.data);
-        setExpenses(expensesResponse.data);
-        setCurrentUser(currentUserResponse.data);
-        
+        const currentUserResponse = await axios.get('/api/auth/me');
+        const user = currentUserResponse.data;
+        setCurrentUser(user);
+        return user;
       } catch (error) {
-        console.error("Failed to fetch initial data", error);
+        console.error("Failed to fetch current user", error);
+        // If we can't get the user, don't fetch other data
+        return null;
       }
     };
 
-    fetchData();
+    const fetchAllData = async (user: User) => {
+        try {
+            const dataRequests = [
+                axios.get('/api/projects'),
+                axios.get('/api/tasks'),
+                axios.get('/api/attendance'),
+                axios.get('/api/leave'),
+                axios.get('/api/expenses'),
+            ];
+
+            // Only fetch all users if the current user is an admin
+            if (user.role === 'Admin') {
+                dataRequests.unshift(axios.get('/api/users'));
+            } else {
+                // Otherwise, just populate the users array with the current user
+                setUsers([user]);
+            }
+
+            const responses = await Promise.all(dataRequests);
+
+            let responseIndex = 0;
+            if (user.role === 'Admin') {
+                setUsers(responses[responseIndex++].data);
+            }
+
+            setProjects(responses[responseIndex++].data);
+            setTasks(responses[responseIndex++].data);
+            setAttendance(responses[responseIndex++].data);
+            setLeaves(responses[responseIndex++].data);
+            setExpenses(responses[responseIndex++].data);
+        
+        } catch (error) {
+            console.error("Failed to fetch initial data", error);
+        }
+    };
+
+    const initialize = async () => {
+        const user = await fetchCurrentUser();
+        if (user) {
+            await fetchAllData(user);
+        }
+    }
+
+    initialize();
   }, []);
   
   const markAttendance = (status: Attendance['status']) => {

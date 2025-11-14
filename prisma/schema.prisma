@@ -1,13 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-// generator client {
-//   provider = "prisma-client"
-//   output   = "../src/generated/prisma"
-// }
+// prisma/schema.prisma
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
@@ -126,8 +117,8 @@ model User {
   invoices         Invoice[]
   aiLogs           AiLog[]
   attendance       Attendance[]
-
-  reviewedLeaves Leave[] @relation("ReviewedLeaves")
+  ledProjects      Project[]       @relation("ProjectLead")
+  reviewedLeaves   Leave[]         @relation("ReviewedLeaves")
 
   taskComments TaskComment[]
 
@@ -152,7 +143,8 @@ model Session {
 
 model Project {
   id          String        @id @default(uuid())
-  title       String
+  title       String?
+  name        String // added to align with API payloads that send `name`
   description String?
   progress    Int           @default(0)
   isPublic    Boolean       @default(false)
@@ -160,10 +152,18 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  // Additional fields used by your routes
+  startDate DateTime?
+  endDate   DateTime?
+
   // Relations
   members  ProjectMember[]
   tasks    Task[]
   invoices Invoice[]
+
+  // relation back to lead (optional)
+  leadId String?
+  lead   User?   @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
 
   @@map("projects")
 }
@@ -242,10 +242,10 @@ model TaskComment {
 // -----------------------------------------
 
 model Attendance {
-  id        String    @id @default(uuid())
-  userId    String
-  checkIn   DateTime
-  checkOut  DateTime?
+  id       String    @id @default(uuid())
+  userId   String
+  checkIn  DateTime
+  checkOut DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -1,33 +1,20 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
 
-// Define routes that require admin access
-const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/login",
+  "/register",
+]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
 
-  // Get user role from session claims
-  const userRole = (sessionClaims?.metadata as any)?.role;
-
-  // If the user is trying to access an admin route
-  if (isAdminRoute(req)) {
-    // If the user is not an admin, redirect them to the home page
-    if (userRole !== 'ADMIN') {
-      const homeUrl = new URL("/", req.url);
-      return NextResponse.redirect(homeUrl);
-    }
+  if (!isPublicRoute(req) && !userId) {
+    return (await auth()).redirectToSignIn();
   }
-
-  // Allow access to the requested route
-  return NextResponse.next();
 });
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
