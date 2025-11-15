@@ -12,12 +12,11 @@ export const GET = withAuth(async (req: Request) => {
 });
 
 export const POST = withAuth(async (req: Request) => {
-  // create own expense
   const { user } = await requirePermission(req, "expenses:create");
 
   const { amount, description, projectId, category, receiptUrl } = await req.json();
 
-  if (!amount || !description || !projectId) {
+  if (!amount || !description) {
     return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
   }
 
@@ -26,12 +25,12 @@ export const POST = withAuth(async (req: Request) => {
       userId: user.id,
       amount,
       description,
-      projectId,
+      projectId: projectId ?? null,
       status: "PENDING",
-      category: category ?? undefined,
-      receiptUrl: receiptUrl ?? undefined,
+      category: category ?? null,
+      receiptUrl: receiptUrl ?? null,
     },
   });
 
-  return newExpense;
+  return Response.json(newExpense);
 });

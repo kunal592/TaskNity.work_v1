@@ -19,14 +19,15 @@ import { CalendarPlus } from 'lucide-react';
 import { Leave } from '@/types';
 
 export default function LeaveRequestButton() {
-  const { currentUser, leaves, setLeaves, roleAccess } = useApp();
+  const { currentUser, leaves, setLeaves, roleAccess, createLeave } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isLoading, setIsLoading] = useState(false);
 
   if (roleAccess.canManageTeam) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!reason || !date) {
       toast.error('Please provide a reason and date.');
       return;
@@ -37,18 +38,23 @@ export default function LeaveRequestButton() {
       return;
     }
 
-    const newLeaveRequest: Leave = {
-      id: `leave-${Date.now()}`,
-      userId: currentUser.id,
-      reason,
-      date,
-      status: 'Pending',
-    };
+    setIsLoading(true);
+    try {
+      const newLeave = await createLeave({
+        reason,
+        date,
+      });
 
-    setLeaves([...leaves, newLeaveRequest]);
-    toast.success('Leave request submitted!');
-    setIsOpen(false);
-    setReason('');
+      setLeaves([...leaves, newLeave]);
+      toast.success('Leave request submitted!');
+      setIsOpen(false);
+      setReason('');
+      setDate(new Date().toISOString().split('T')[0]);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to submit leave request');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,7 +81,7 @@ export default function LeaveRequestButton() {
           />
         </div>
         <DialogFooter>
-          <Button onClick={handleSubmit}>Submit Request</Button>
+          <Button onClick={handleSubmit} disabled={isLoading}>{isLoading ? 'Submitting...' : 'Submit Request'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

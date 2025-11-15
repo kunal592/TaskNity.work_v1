@@ -44,39 +44,48 @@ const initialNewTaskState = {
 };
 
 export default function ProjectsPage() {
-  const { projects, setProjects, tasks, setTasks, users, roleAccess } = useApp();
+  const { projects, setProjects, tasks, setTasks, users, roleAccess, createProject, createTask } = useApp();
   const [newProjectName, setNewProjectName] = useState("");
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState<string | null>(null);
   const [newTask, setNewTask] = useState(initialNewTaskState);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!roleAccess.canManageProjects) {
     return <p className="p-6 text-red-500">You don't have access to manage projects.</p>;
   }
 
-  const handleAddProject = () => {
+  const handleAddProject = async () => {
     if (!newProjectName.trim()) {
       toast.error("Project name cannot be empty.");
       return;
     }
-    const newProject: Project = {
-      id: `proj-${Date.now()}`,
-      title: newProjectName,
-      progress: 0,
-      members: [],
-      isPublic: true,
-    };
-    setProjects([newProject, ...projects]);
-    setNewProjectName("");
-    toast.success(`Project "${newProjectName}" created.`);
+    
+    setIsLoading(true);
+    try {
+      const newProject = await createProject({
+        name: newProjectName,
+      });
+      setProjects([newProject, ...projects]);
+      setNewProjectName("");
+      toast.success(`Project "${newProjectName}" created.`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to create project");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleTogglePublic = (projectId: string) => {
-    setProjects(
-      projects.map((p) =>
-        p.id === projectId ? { ...p, isPublic: !p.isPublic } : p
-      )
-    );
+  const handleTogglePublic = async (projectId: string) => {
+    try {
+      setProjects(
+        projects.map((p) =>
+          p.id === projectId ? { ...p, isPublic: !p.isPublic } : p
+        )
+      );
+    } catch (error) {
+      console.error("Failed to toggle public status:", error);
+    }
   };
 
   const handleCompleteProject = (projectId: string) => {
@@ -89,31 +98,40 @@ export default function ProjectsPage() {
     }));
   };
 
-  const handleAddTask = (projectId: string) => {
+  const handleAddTask = async (projectId: string) => {
     if (!newTask.title || !newTask.title.trim()) {
         toast.error("Task title cannot be empty.");
         return;
     }
-    const newTaskData: Task = {
-        id: `task-${Date.now()}`,
+    
+    setIsLoading(true);
+    try {
+      const createdTask = await createTask({
         title: newTask.title,
         description: newTask.description,
-        status: "To Do",
-        priority: newTask.priority,
         projectId: projectId,
-        assignedTo: newTask.assignedTo,
-        deadline: newTask.deadline?.toISOString().split('T')[0],
-        classified: newTask.classified,
-        isDraft: true,
-    };
-    setTasks([...tasks, newTaskData]);
-    setNewTask(initialNewTaskState);
-    setIsTaskDialogOpen(null);
-    toast.success("Draft task created.");
+        priority: newTask.priority,
+        dueDate: newTask.deadline?.toISOString().split('T')[0],
+        status: "todo",
+      });
+      
+      setTasks([...tasks, createdTask]);
+      setNewTask(initialNewTaskState);
+      setIsTaskDialogOpen(null);
+      toast.success("Draft task created.");
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to create task");
+    } finally {
+      setIsLoading(false);
+    }
   }
   
-  const handlePublishTask = (taskId: string) => {
-    setTasks(tasks.map(t => t.id === taskId ? {...t, isDraft: false} : t));
+  const handlePublishTask = async (taskId: string) => {
+    try {
+      setTasks(tasks.map(t => t.id === taskId ? {...t, isDraft: false} : t));
+    } catch (error) {
+      console.error("Failed to publish task:", error);
+    }
     toast.success("Task published to Kanban board!");
   }
   
@@ -133,8 +151,8 @@ export default function ProjectsPage() {
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
           />
-          <Button onClick={handleAddProject}>
-            <PlusCircle className="mr-2" /> Add Project
+          <Button onClick={handleAddProject} disabled={isLoading}>
+            <PlusCircle className="mr-2" /> {isLoading ? "Creating..." : "Add Project"}
           </Button>
         </CardContent>
       </Card>
@@ -253,7 +271,7 @@ export default function ProjectsPage() {
                               <Label htmlFor={`classified-switch-${project.id}`} className="text-red-600 font-medium">Mark as Classified</Label>
                             </div>
 
-                            <Button onClick={() => handleAddTask(project.id)} className="w-full">Create Draft Task</Button>
+                            <Button onClick={() => handleAddTask(project.id)} className="w-full" disabled={isLoading}>{isLoading ? "Creating..." : "Create Draft Task"}</Button>
                           </div>
                         </DialogContent>
                       </Dialog>

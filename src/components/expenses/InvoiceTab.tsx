@@ -1,16 +1,30 @@
 
 "use client";
-import { useState } from "react";
-import { useFinanceStore } from "@/store/useFinanceStore";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import InvoiceGenerator from "./InvoiceGenerator";
 
 export default function InvoiceTab() {
-  const { invoices } = useFinanceStore((state: any) => ({
-    invoices: state.invoices,
-  }));
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        const response = await axios.get('/api/invoices');
+        setInvoices(Array.isArray(response.data) ? response.data : response.data?.invoices || []);
+      } catch (error) {
+        console.error("Failed to fetch invoices:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchInvoices();
+  }, []);
 
   return (
     <>
@@ -32,22 +46,28 @@ export default function InvoiceTab() {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((i: any) => (
-                <tr key={i.id} className="border-b">
-                  <td className="p-2">{i.client}</td>
-                  <td className="p-2">{i.date}</td>
-                  <td className="p-2">₹{i.amount.toFixed(2)}</td>
-                  <td
-                    className={`p-2 font-medium ${
-                      i.status === "Paid"
-                        ? "text-green-600"
-                        : "text-yellow-600"
-                    }`}
-                  >
-                    {i.status}
-                  </td>
-                </tr>
-              ))}
+              {loading ? (
+                <tr><td colSpan={4} className="p-2 text-center">Loading...</td></tr>
+              ) : invoices.length === 0 ? (
+                <tr><td colSpan={4} className="p-2 text-center text-muted-foreground">No invoices found</td></tr>
+              ) : (
+                invoices.map((i: any) => (
+                  <tr key={i.id} className="border-b">
+                    <td className="p-2">{i.client || `Project ${i.projectId}`}</td>
+                    <td className="p-2">{i.date || i.issuedAt ? new Date(i.issuedAt || i.date).toLocaleDateString() : 'N/A'}</td>
+                    <td className="p-2">₹{Number(i.amount).toFixed(2)}</td>
+                    <td
+                      className={`p-2 font-medium ${
+                        (i.status === "Paid" || i.status === "PAID")
+                          ? "text-green-600"
+                          : "text-yellow-600"
+                      }`}
+                    >
+                      {i.status}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </CardContent>

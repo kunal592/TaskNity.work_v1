@@ -20,7 +20,6 @@ enum UserRole {
   VIEWER
 }
 
-
 enum ProjectStatus {
   ACTIVE
   ARCHIVED
@@ -162,10 +161,10 @@ model Project {
   members  ProjectMember[]
   tasks    Task[]
   invoices Invoice[]
-
+  expenses Expense[]       @relation("ProjectExpenses")
   // relation back to lead (optional)
-  leadId String?
-  lead   User?   @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  leadId   String?
+  lead     User?           @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
 
   @@map("projects")
 }
@@ -308,10 +307,14 @@ model Notice {
 // -----------------------------------------
 
 model Expense {
-  id          String          @id @default(uuid())
+  id          String  @id @default(uuid())
   userId      String
-  amount      Decimal         @db.Decimal(10, 2)
+  amount      Decimal @db.Decimal(10, 2)
   description String
+
+  projectId String?
+  project   Project? @relation("ProjectExpenses", fields: [projectId], references: [id], onDelete: SetNull)
+
   status      ExpenseStatus   @default(PENDING)
   submittedAt DateTime        @default(now())
   reviewedBy  String?

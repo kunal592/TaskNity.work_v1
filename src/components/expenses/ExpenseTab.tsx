@@ -1,4 +1,3 @@
-
 "use client";
 import { useApp } from "@/context/AppContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -11,33 +10,40 @@ import toast from "react-hot-toast";
 import { Expense } from "@/types";
 
 export default function ExpenseTab() {
-  const { currentUser, roleAccess, expenses, expenseCategories } = useApp();
+  const { currentUser, roleAccess, expenses, expenseCategories, createExpense } = useApp();
   const [allExpenses, setAllExpenses] = useState(expenses);
-  const [newExpense, setNewExpense] = useState({ title: "", category: "", amount: "" });
+  const [newExpense, setNewExpense] = useState({ title: "", category: "", amount: "", projectId: "" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!currentUser || !roleAccess.canManageExpenses) {
     return <p className="text-red-500 p-4">Access denied. Admin only.</p>;
   }
 
-  const addExpense = () => {
+  const addExpense = async () => {
     if (!newExpense.title || !newExpense.amount || !newExpense.category) {
       toast.error("Fill all fields");
       return;
     }
-    const newExpenseData: Expense = {
-      id: Date.now().toString(),
-      title: newExpense.title,
-      category: newExpense.category,
-      amount: Number(newExpense.amount),
-      date: new Date().toISOString().split("T")[0],
-      requestedBy: currentUser.name,
-      status: "Approved",
-    };
-    setAllExpenses([...allExpenses, newExpenseData]);
-    toast.success("Expense added!");
-    setNewExpense({ title: "", category: "", amount: "" });
-    setIsDialogOpen(false);
+
+    setIsLoading(true);
+    try {
+      const createdExpense = await createExpense({
+        amount: parseFloat(newExpense.amount),
+        description: newExpense.title,
+        category: newExpense.category,
+        projectId: newExpense.projectId || undefined,
+      });
+      
+      setAllExpenses([...allExpenses, createdExpense]);
+      toast.success("Expense added!");
+      setNewExpense({ title: "", category: "", amount: "", projectId: "" });
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to add expense");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   return (
@@ -61,7 +67,7 @@ export default function ExpenseTab() {
                 </SelectContent>
               </Select>
               <Input type="number" placeholder="Amount" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })} />
-              <Button onClick={addExpense}>Save</Button>
+              <Button onClick={addExpense} disabled={isLoading}>{isLoading ? "Saving..." : "Save"}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -84,7 +90,7 @@ export default function ExpenseTab() {
                 <tr key={exp.id} className="border-b last:border-none">
                   <td className="p-2">{exp.title}</td>
                   <td className="p-2">{exp.category}</td>
-                  <td className="p-2">₹{exp.amount.toFixed(2)}</td>
+                  <td className="p-2">₹{Number(exp.amount).toFixed(2)}</td>
                   <td className="p-2">{exp.date}</td>
                   <td className="p-2">{exp.requestedBy}</td>
                   <td className={`p-2 ${exp.status === "Approved" ? "text-green-600" : exp.status === "Pending" ? "text-yellow-600" : "text-red-600"}`}>{exp.status}</td>

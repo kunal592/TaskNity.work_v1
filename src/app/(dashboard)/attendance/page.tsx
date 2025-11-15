@@ -1,4 +1,6 @@
 "use client";
+"use client";
+import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,13 +11,14 @@ import { motion } from "framer-motion";
 
 export default function AttendancePage() {
   const { currentUser, attendance, markAttendance, roleAccess } = useApp();
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!currentUser) {
     return <p className="p-6 text-muted-foreground">Loading attendance data...</p>;
   }
 
   if (!roleAccess.canMarkAttendance) {
-    return <p className="text-red-500 p-4">You don’t have access to Attendance.</p>;
+    return <p className="text-red-500 p-4">You don't have access to Attendance.</p>;
   }
 
   const today = new Date().toISOString().split("T")[0];
@@ -28,6 +31,18 @@ export default function AttendancePage() {
   const recentAttendance = userLogs
     .slice(-7)
     .map((a) => ({ date: a.date.slice(5), value: a.status === "Present" ? 1 : 0.5 }));
+
+  const handleMarkAttendance = async (status: string) => {
+    setIsLoading(true);
+    try {
+      await markAttendance(status as any);
+      toast.success(`Marked ${status}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to mark attendance");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -49,10 +64,10 @@ export default function AttendancePage() {
               </p>
             ) : (
               <>
-                <Button onClick={() => { markAttendance("Present"); toast.success("Marked Present"); }}>
+                <Button onClick={() => handleMarkAttendance("Present")} disabled={isLoading}>
                   Check In (Present)
                 </Button>
-                <Button variant="outline" onClick={() => { markAttendance("Remote"); toast.success("Marked Remote"); }}>
+                <Button variant="outline" onClick={() => handleMarkAttendance("Remote")} disabled={isLoading}>
                   Work from Home (Remote)
                 </Button>
               </>

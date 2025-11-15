@@ -1,8 +1,9 @@
 // src/lib/permissionGuards.ts
 import { NextResponse } from "next/server";
 import { can, RBAC, Role } from "./rbac";
-import { getCurrentDbUser } from "./getCurrentDbUser";
+import { getCurrentDbUser } from "@/lib/getCurrentDbUser";
 import { prisma } from "./db";
+
 
 /**
  * Resource shape we attempt to inspect for ownership.
@@ -102,7 +103,8 @@ export async function requirePermission(
   // If the action is own-scoped and a resourceFetcher is provided, get the resource
   let resource: ResourceLike | undefined = undefined;
   if (own && options?.resourceFetcher) {
-    resource = await options.resourceFetcher(options?.params);
+    const fetched = await options.resourceFetcher(options?.params);
+    resource = fetched ?? undefined;
     if (!resource) {
       // if we can't load resource for ownership check, deny
       throw NextResponse.json({ error: "Forbidden" }, { status: 403 });

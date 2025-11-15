@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import axios from "axios";
 import {
   DndContext,
   DragEndEvent,
@@ -14,6 +15,7 @@ import { SortableContext, arrayMove } from "@dnd-kit/sortable";
 import KanbanColumn, { Column } from "./KanbanColumn";
 import { Task } from "@/types";
 import TaskCard from "./TaskCard";
+import { useApp } from "@/context/AppContext";
 
 const defaultCols: Column[] = [
   {
@@ -30,18 +32,36 @@ const defaultCols: Column[] = [
   },
 ];
 
-const defaultTasks: Task[] = [
-    // This is placeholder, real data will come from props
-];
-
 export default function KanbanBoard() {
+  const { tasks: contextTasks, updateTask } = useApp();
   const [columns, setColumns] = useState<Column[]>(defaultCols);
   const columnsId = useMemo(() => columns.map((col) => col.id), [columns]);
 
-  const [tasks, setTasks] = useState<Task[]>(defaultTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [activeColumn, setActiveColumn] = useState<Column | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        if (contextTasks && contextTasks.length > 0) {
+          setTasks(contextTasks);
+        } else {
+          const response = await axios.get('/api/tasks');
+          const tasksData = Array.isArray(response.data) ? response.data : response.data?.tasks || [];
+          setTasks(tasksData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tasks:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadTasks();
+  }, [contextTasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -85,7 +105,7 @@ export default function KanbanBoard() {
     });
   }
 
-  function onDragOver(event: DragOverEvent) {
+  async function onDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over) return;
 
@@ -105,7 +125,11 @@ export default function KanbanBoard() {
         const overIndex = tasks.findIndex((t) => t.id === overId);
 
         if (tasks[activeIndex].status != tasks[overIndex].status) {
-          tasks[activeIndex].status = tasks[overIndex].status;
+          tasks[activeIndex].status = tasks[overIndex].status as any;
+          // Update task status in API
+          updateTask(String(activeId), { status: tasks[overIndex].status }).catch(err => 
+            console.error("Failed to update task status:", err)
+          );
           return arrayMove(tasks, activeIndex, overIndex - 1);
         }
 
@@ -118,10 +142,19 @@ export default function KanbanBoard() {
       setTasks((tasks) => {
         const activeIndex = tasks.findIndex((t) => t.id === activeId);
         tasks[activeIndex].status = overId as Task['status'];
+        // Update task status in API
+        updateTask(String(activeId), { status: overId }).catch(err => 
+          console.error("Failed to update task status:", err)
+        );
         return arrayMove(tasks, activeIndex, activeIndex);
       });
     }
   }
+
+  if (loading) {
+    return <div className="m-auto flex min-h-screen w-full items-center justify-center">Loading tasks...</div>;
+  }
+
   return (
     <div className="m-auto flex min-h-screen w-full items-center overflow-x-auto overflow-y-hidden px-[40px]">
       <DndContext

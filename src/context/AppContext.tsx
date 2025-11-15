@@ -32,34 +32,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const fetchAllData = async (user: User) => {
         try {
-            const dataRequests = [
-                axios.get('/api/projects'),
-                axios.get('/api/tasks'),
-                axios.get('/api/attendance'),
-                axios.get('/api/leave'),
-                axios.get('/api/expenses'),
-            ];
+            const dataRequests: Promise<any>[] = [];
+            const fetchKeys: string[] = [];
 
-            // Only fetch all users if the current user is an admin
-            if (user.role === 'Admin') {
-                dataRequests.unshift(axios.get('/api/users'));
-            } else {
-                // Otherwise, just populate the users array with the current user
-                setUsers([user]);
+            // Only fetch all users if the current user has permission
+            try {
+              await axios.get('/api/users');
+              dataRequests.push(axios.get('/api/users'));
+              fetchKeys.push('users');
+            } catch (error) {
+              // User doesn't have permission, skip users fetch
+              setUsers([user]);
             }
 
-            const responses = await Promise.all(dataRequests);
+            // Always fetch these
+            dataRequests.push(axios.get('/api/projects'));
+            fetchKeys.push('projects');
+            
+            dataRequests.push(axios.get('/api/tasks'));
+            fetchKeys.push('tasks');
+            
+            dataRequests.push(axios.get('/api/attendance'));
+            fetchKeys.push('attendance');
+            
+            dataRequests.push(axios.get('/api/leave'));
+            fetchKeys.push('leave');
+            
+            dataRequests.push(axios.get('/api/expenses'));
+            fetchKeys.push('expenses');
 
-            let responseIndex = 0;
-            if (user.role === 'Admin') {
-                setUsers(responses[responseIndex++].data);
-            }
+            const responses = await Promise.allSettled(dataRequests);
 
-            setProjects(responses[responseIndex++].data);
-            setTasks(responses[responseIndex++].data);
-            setAttendance(responses[responseIndex++].data);
-            setLeaves(responses[responseIndex++].data);
-            setExpenses(responses[responseIndex++].data);
+            responses.forEach((response, index) => {
+              if (response.status === 'fulfilled') {
+                const key = fetchKeys[index];
+                const data = response.value.data;
+                
+                switch(key) {
+                  case 'users':
+                    setUsers(Array.isArray(data) ? data : (data?.users || [user]));
+                    break;
+                  case 'projects':
+                    setProjects(Array.isArray(data) ? data : (data?.projects || []));
+                    break;
+                  case 'tasks':
+                    setTasks(Array.isArray(data) ? data : (data?.tasks || []));
+                    break;
+                  case 'attendance':
+                    setAttendance(Array.isArray(data) ? data : (data?.attendance || []));
+                    break;
+                  case 'leave':
+                    setLeaves(Array.isArray(data) ? data : (data?.leaves || []));
+                    break;
+                  case 'expenses':
+                    setExpenses(Array.isArray(data) ? data : (data?.expenses || []));
+                    break;
+                }
+              } else {
+                const key = fetchKeys[index];
+                console.error(`Failed to fetch ${key}:`, response.reason);
+              }
+            });
         
         } catch (error) {
             console.error("Failed to fetch initial data", error);
@@ -76,22 +109,124 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     initialize();
   }, []);
   
-  const markAttendance = (status: Attendance['status']) => {
-    const today = new Date().toISOString().split("T")[0];
-    if (!currentUser) return;
-
-    const existingEntry = attendance.find(
-      (a) => a.userId === currentUser.id && a.date === today
-    );
-
-    if (!existingEntry) {
-      const newAttendance: Attendance = {
-        id: `att-${Date.now()}`,
-        userId: currentUser.id,
-        date: today,
-        status,
-      };
+  const markAttendance = async (status: Attendance['status']) => {
+    try {
+      const response = await axios.post('/api/attendance', { status });
+      const newAttendance: Attendance = response.data;
       setAttendance([...attendance, newAttendance]);
+      return newAttendance;
+    } catch (error) {
+      console.error("Failed to mark attendance:", error);
+      throw error;
+    }
+  };
+
+  // API integration helper functions
+  const createExpense = async (data: { amount: number; description: string; projectId?: string; category?: string; receiptUrl?: string }) => {
+    try {
+      const response = await axios.post('/api/expenses', data);
+      setExpenses([...expenses, response.data]);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to create expense:", error);
+      throw error;
+    }
+  };
+
+  const updateExpense = async (expenseId: string, data: { status: string }) => {
+    try {
+      const response = await axios.put(`/api/expenses/${expenseId}`, data);
+      setExpenses(expenses.map(e => e.id === expenseId ? response.data : e));
+      return response.data;
+    } catch (error) {
+      console.error("Failed to update expense:", error);
+      throw error;
+    }
+  };
+
+  const createLeave = async (data: { reason: string; date: string; type?: string }) => {
+    try {
+      const response = await axios.post('/api/leave', data);
+      setLeaves([...leaves, response.data]);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to create leave:", error);
+      throw error;
+    }
+  };
+
+  const updateLeave = async (leaveId: string, data: { status: string }) => {
+    try {
+      const response = await axios.put(`/api/leave/${leaveId}`, data);
+      setLeaves(leaves.map(l => l.id === leaveId ? response.data : l));
+      return response.data;
+    } catch (error) {
+      console.error("Failed to update leave:", error);
+      throw error;
+    }
+  };
+
+  const createTask = async (data: { title: string; description?: string; projectId: string; status?: string; priority?: string; dueDate?: string; assigneeId?: string }) => {
+    try {
+      const response = await axios.post('/api/tasks', data);
+      setTasks([...tasks, response.data]);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to create task:", error);
+      throw error;
+    }
+  };
+
+  const updateTask = async (taskId: string, data: any) => {
+    try {
+      const response = await axios.put(`/api/tasks/${taskId}`, data);
+      setTasks(tasks.map(t => t.id === taskId ? response.data : t));
+      return response.data;
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      throw error;
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    try {
+      await axios.delete(`/api/tasks/${taskId}`);
+      setTasks(tasks.filter(t => t.id !== taskId));
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      throw error;
+    }
+  };
+
+  const createProject = async (data: { name: string; description?: string; leadId?: string }) => {
+    try {
+      const response = await axios.post('/api/projects', data);
+      setProjects([...projects, response.data]);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to create project:", error);
+      throw error;
+    }
+  };
+
+  const updateProject = async (projectId: string, data: any) => {
+    try {
+      const response = await axios.put(`/api/projects/${projectId}`, data);
+      setProjects(projects.map(p => p.id === projectId ? response.data : p));
+      return response.data;
+    } catch (error) {
+      console.error("Failed to update project:", error);
+      throw error;
+    }
+  };
+
+  const deleteProject = async (projectId: string) => {
+    try {
+      await axios.delete(`/api/projects/${projectId}`);
+      setProjects(projects.filter(p => p.id !== projectId));
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      throw error;
     }
   };
 
@@ -119,6 +254,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     roleAccess,
     expenses,
     expenseCategories,
+    // API methods
+    createExpense,
+    updateExpense,
+    createLeave,
+    updateLeave,
+    createTask,
+    updateTask,
+    deleteTask,
+    createProject,
+    updateProject,
+    deleteProject,
   }
   
   return (

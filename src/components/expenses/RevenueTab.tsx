@@ -1,6 +1,7 @@
 
 "use client";
-import { useFinanceStore } from "@/store/useFinanceStore";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   ResponsiveContainer,
@@ -14,15 +15,29 @@ import {
 const COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
 export default function RevenueTab() {
-    const { invoices } = useFinanceStore((state: any) => ({
-        invoices: state.invoices,
-    }));
-    
-    const paidInvoices = invoices.filter((i: any) => i.status === "Paid");
-    const pendingInvoices = invoices.filter((i: any) => i.status === "Pending");
+    const [invoices, setInvoices] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const totalRevenue = paidInvoices.reduce((sum: number, i: any) => sum + i.amount, 0);
-    const pendingRevenue = pendingInvoices.reduce((sum: number, i: any) => sum + i.amount, 0);
+    useEffect(() => {
+      const fetchInvoices = async () => {
+        try {
+          const response = await axios.get('/api/invoices');
+          setInvoices(Array.isArray(response.data) ? response.data : response.data?.invoices || []);
+        } catch (error) {
+          console.error("Failed to fetch invoices:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchInvoices();
+    }, []);
+    
+    const paidInvoices = invoices.filter((i: any) => i.status === "Paid" || i.status === "PAID");
+    const pendingInvoices = invoices.filter((i: any) => i.status === "Pending" || i.status === "PENDING");
+
+    const totalRevenue = paidInvoices.reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
+    const pendingRevenue = pendingInvoices.reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
 
     const revenueData = [
         { name: "Paid", value: totalRevenue },
@@ -65,14 +80,20 @@ export default function RevenueTab() {
                         </tr>
                     </thead>
                     <tbody>
-                        {invoices.map((i: any) => (
-                        <tr key={i.id} className="border-b last:border-b-0">
-                            <td className="p-2 font-medium">{i.client}</td>
-                            <td className="p-2">{i.date}</td>
-                            <td className="p-2">₹{i.amount.toFixed(2)}</td>
-                            <td className={`p-2 font-medium ${i.status === 'Paid' ? 'text-green-600' : 'text-yellow-600'}`}>{i.status}</td>
-                        </tr>
-                        ))}
+                        {loading ? (
+                          <tr><td colSpan={4} className="p-2 text-center">Loading...</td></tr>
+                        ) : invoices.length === 0 ? (
+                          <tr><td colSpan={4} className="p-2 text-center text-muted-foreground">No invoices found</td></tr>
+                        ) : (
+                          invoices.map((i: any) => (
+                            <tr key={i.id} className="border-b last:border-b-0">
+                                <td className="p-2 font-medium">{i.client || `Project ${i.projectId}`}</td>
+                                <td className="p-2">{i.date || i.issuedAt ? new Date(i.issuedAt || i.date).toLocaleDateString() : 'N/A'}</td>
+                                <td className="p-2">₹{Number(i.amount).toFixed(2)}</td>
+                                <td className={`p-2 font-medium ${(i.status === 'Paid' || i.status === 'PAID') ? 'text-green-600' : 'text-yellow-600'}`}>{i.status}</td>
+                            </tr>
+                          ))
+                        )}
                     </tbody>
                     </table>
                 </CardContent>

@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Sidebar from "@/components/layout/Sidebar";
 import OrgTree from "@/components/layout/OrgTree";
 import LeaveRequestButton from "@/components/layout/LeaveRequestButton";
+import { ApiErrorInterceptorInitializer } from "@/components/providers/ApiErrorInterceptorInitializer";
 import {
   ClerkProvider,
   SignedIn,
@@ -42,6 +43,7 @@ export default function RootLayout({
         </head>
         <body className="font-body antialiased">
           <AppProvider>
+            <ApiErrorInterceptorInitializer />
             <SignedIn>
               <Sidebar />
               <main className="p-6 pt-20">

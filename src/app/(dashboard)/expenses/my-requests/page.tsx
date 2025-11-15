@@ -10,34 +10,40 @@ import toast from "react-hot-toast";
 import { Expense } from "@/types";
 
 export default function MyRequests() {
-  const { currentUser, expenses, expenseCategories } = useApp();
+  const { currentUser, expenses, expenseCategories, createExpense } = useApp();
   
   const [requests, setRequests] = useState<Expense[]>(
     currentUser ? expenses.filter((e) => e.requestedBy === currentUser.name) : []
   );
   const [form, setForm] = useState({ title: "", category: "", amount: "" });
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!currentUser) {
     return <p className="text-red-500 p-4">Please log in to see your requests.</p>;
   }
 
-  const submitRequest = () => {
+  const submitRequest = async () => {
     if (!form.title || !form.amount || !form.category) {
       toast.error("Please fill all fields");
       return;
     }
-    const newRequest: Expense = {
-      id: Date.now().toString(),
-      title: form.title,
-      category: form.category,
-      amount: Number(form.amount),
-      requestedBy: currentUser.name,
-      date: new Date().toISOString().split("T")[0],
-      status: "Pending",
-    };
-    setRequests([...requests, newRequest]);
-    toast.success("Request submitted");
-    setForm({ title: "", category: "", amount: "" });
+    
+    setIsLoading(true);
+    try {
+      const newRequest = await createExpense({
+        amount: parseFloat(form.amount),
+        description: form.title,
+        category: form.category,
+      });
+      
+      setRequests([...requests, newRequest]);
+      toast.success("Request submitted");
+      setForm({ title: "", category: "", amount: "" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to submit request");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,7 +61,7 @@ export default function MyRequests() {
             </SelectContent>
           </Select>
           <Input type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          <Button onClick={submitRequest}>Submit</Button>
+          <Button onClick={submitRequest} disabled={isLoading}>{isLoading ? "Submitting..." : "Submit"}</Button>
         </CardContent>
       </Card>
 
@@ -78,7 +84,7 @@ export default function MyRequests() {
                   <tr key={r.id} className="border-b last:border-none">
                     <td className="p-2">{r.title}</td>
                     <td className="p-2">{r.category}</td>
-                    <td className="p-2">₹{r.amount.toFixed(2)}</td>
+                    <td className="p-2">₹{Number(r.amount).toFixed(2)}</td>
                     <td className="p-2">{r.date}</td>
                     <td className={`p-2 ${r.status === "Approved" ? "text-green-600" : r.status === "Pending" ? "text-yellow-600" : "text-red-600"}`}>{r.status}</td>
                   </tr>

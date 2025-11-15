@@ -81,6 +81,20 @@ export type AppContextType = {
   expenseCategories: string[];
   roleAccess: RoleAccess;
   setCurrentUser: (user: User | null) => void;
-  markAttendance: (status: Attendance['status']) => void;
+  markAttendance: (status: Attendance['status']) => Promise<Attendance>;
   setTasks: (tasks: Task[]) => void;
+  // API methods for expenses
+  createExpense: (data: { amount: number; description: string; projectId?: string; category?: string; receiptUrl?: string }) => Promise<Expense>;
+  updateExpense: (expenseId: string, data: { status: string }) => Promise<Expense>;
+  // API methods for leave
+  createLeave: (data: { reason: string; date: string; type?: string }) => Promise<Leave>;
+  updateLeave: (leaveId: string, data: { status: string }) => Promise<Leave>;
+  // API methods for tasks
+  createTask: (data: { title: string; description?: string; projectId: string; status?: string; priority?: string; dueDate?: string; assigneeId?: string }) => Promise<Task>;
+  updateTask: (taskId: string, data: any) => Promise<Task>;
+  deleteTask: (taskId: string) => Promise<void>;
+  // API methods for projects
+  createProject: (data: { name: string; description?: string; leadId?: string }) => Promise<Project>;
+  updateProject: (projectId: string, data: any) => Promise<Project>;
+  deleteProject: (projectId: string) => Promise<void>;
 };

@@ -12,8 +12,9 @@ export const POST = withAuth(async (req: Request, { params }: any) => {
 
   const updatedTask = await prisma.task.update({
     where: { id: params.taskId },
-    data: { /* original uses assigneeId field - preserve */ assigneeId: userId },
+    data: { assignees: { connect: { id: userId } } },
+    include: { assignees: true },
   });
 
-  return updatedTask;
+  return new Response(JSON.stringify(updatedTask), { status: 200 });
 });
