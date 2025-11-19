@@ -1,7 +1,6 @@
-
 'use client';
 import { useState } from 'react';
-import useUsersData, { User } from '@/hooks/useUsersData';
+import useTeamData, { TeamUser } from '@/hooks/useTeamData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,18 +36,21 @@ const initialNewUserState = {
   email: '',
   phone: '',
   address: '',
-  role: 'Member' as User['role'],
+  role: 'MEMBER' as TeamUser['role'],
   team: 'Frontend',
   salary: '',
   github: '',
   linkedin: '',
-  joined: new Date().toISOString().split("T")[0]
+  joined: new Date().toISOString().split("T")[0],
+  avatarUrl: '',
 };
 
 export default function TeamPage() {
-  const { users, addUser, deleteUser } = useUsersData();
+  const { team, addTeamMember, deleteTeamMember, loading } = useTeamData();
   const { roleAccess } = useApp();
-  const [profileUser, setProfileUser] = useState<number | null>(null);
+  // note: user IDs are strings (UUIDs) in Prisma schema; modal expects a number in original code
+  // to avoid changing modal in this patch we'll store as string and cast when passing (recommended: update modal to accept string)
+  const [profileUser, setProfileUser] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState(initialNewUserState);
@@ -66,38 +68,57 @@ export default function TeamPage() {
     setNewUser(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.role || !newUser.team) {
       toast.error('Please fill in all required fields (Name, Email, Role, Team).');
       return;
     }
-    const userToAdd = {
-        ...newUser,
-        salary: parseFloat(newUser.salary) || 0
+    const payload: Partial<TeamUser> = {
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      team: newUser.team,
+      phone: newUser.phone || undefined,
+      address: newUser.address || undefined,
+      // salary/github/linkedin are UI-only for now (DB doesn't persist them). They will be merged into UI state after successful create.
+      salary: newUser.salary ? Number(newUser.salary) : undefined,
+      github: newUser.github || undefined,
+      linkedin: newUser.linkedin || undefined,
+      joined: newUser.joined,
+      avatarUrl: newUser.avatarUrl || undefined,
     };
-    addUser(userToAdd);
-    toast.success('User added successfully!');
-    setIsAddUserOpen(false);
-    setNewUser(initialNewUserState);
+
+    try {
+      await addTeamMember(payload);
+      toast.success('User added successfully!');
+      setIsAddUserOpen(false);
+      setNewUser(initialNewUserState);
+    } catch (e: any) {
+      toast.error(`Failed to add user: ${e?.message ?? e}`);
+    }
   };
 
-  const handleTerminate = (userId: number) => {
-    deleteUser(userId);
-    toast.success('Employee terminated successfully!');
+  const handleTerminate = async (userId: string) => {
+    const ok = await deleteTeamMember(userId);
+    if (ok) toast.success('Employee terminated successfully!');
+    else toast.error('Failed to terminate employee');
   }
 
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(search.toLowerCase()) ||
-    user.email.toLowerCase().includes(search.toLowerCase())
+  const filteredUsers = team.filter((user) =>
+    (user.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (user.email ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="p-6 space-y-6">
       {profileUser !== null && (
+        // NOTE: UserProfileModal originally typed userId as number.
+        // Since Prisma uses string UUIDs for ids, a clean long-term fix is to update UserProfileModal to accept string | number.
+        // To avoid changing other files in this PR we cast here for TS compatibility.
         <UserProfileModal
           open={profileUser !== null}
           onClose={() => setProfileUser(null)}
-          userId={profileUser}
+          userId={profileUser as unknown as number}
         />
       )}
       <div className="flex justify-between items-center">
@@ -129,14 +150,15 @@ export default function TeamPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">Role</Label>
-                 <Select value={newUser.role} onValueChange={(value: User['role']) => handleSelectChange('role', value)}>
+                 <Select value={newUser.role} onValueChange={(value: TeamUser['role']) => handleSelectChange('role', value)}>
                     <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select Role" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Member">Member</SelectItem>
-                        <SelectItem value="Viewer">Viewer</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                        <SelectItem value="MANAGER">Manager</SelectItem>
+                        <SelectItem value="MEMBER">Member</SelectItem>
+                        <SelectItem value="VIEWER">Viewer</SelectItem>
                     </SelectContent>
                 </Select>
               </div>
@@ -157,6 +179,12 @@ export default function TeamPage() {
                     </SelectContent>
                 </Select>
               </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="avatarUrl" className="text-right">Avatar URL</Label>
+                <Input id="avatarUrl" value={newUser.avatarUrl} onChange={handleInputChange} className="col-span-3" placeholder="https://example.com/avatar.jpg" />
+              </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="address" className="text-right">Address</Label>
                 <Textarea id="address" value={newUser.address} onChange={handleInputChange} className="col-span-3" />
@@ -169,9 +197,13 @@ export default function TeamPage() {
                 <Label htmlFor="linkedin" className="text-right">LinkedIn</Label>
                 <Input id="linkedin" value={newUser.linkedin} onChange={handleInputChange} className="col-span-3" placeholder="Optional" />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="joined" className="text-right">Joined Date</Label>
+                <Input id="joined" type="date" value={newUser.joined} onChange={handleInputChange} className="col-span-3" />
+              </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleAddUser}>Add Employee</Button>
+              <Button onClick={handleAddUser} disabled={loading}>Add Employee</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -208,9 +240,9 @@ export default function TeamPage() {
                         onClick={() => setProfileUser(user.id)}
                       >
                         <Avatar>
-                          <AvatarImage src={user.avatar} alt={user.name} />
+                          <AvatarImage src={user.avatarUrl ?? undefined} alt={user.name ?? ''} />
                           <AvatarFallback>
-                            {user.name.split(' ').map(n => n[0]).join('')}
+                            {(user.name ?? '').split(' ').map(n => n[0]).join('')}
                           </AvatarFallback>
                         </Avatar>
                         <div>
@@ -221,10 +253,10 @@ export default function TeamPage() {
                     </td>
                     <td className="p-3">{user.role}</td>
                     <td className="p-3">{user.team}</td>
-                    <td className="p-3">₹{user.salary?.toLocaleString()}</td>
-                    <td className="p-3">{user.joined}</td>
+                    <td className="p-3">₹{(user.salary ?? '—').toString()}</td>
+                    <td className="p-3">{user.joined ?? '—'}</td>
                     <td className="p-3">
-                      {user.tasks.length > 0 ? (
+                      {user.tasks && user.tasks.length > 0 ? (
                         `${user.tasks.filter(t => t.status === "completed").length}/${user.tasks.length} completed`
                       ) : (
                         "No tasks"
@@ -233,7 +265,7 @@ export default function TeamPage() {
                     <td className="p-3">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                           <Button variant="destructive" size="sm" disabled={user.role === 'Admin'}>Terminate</Button>
+                           <Button variant="destructive" size="sm" disabled={user.role === 'ADMIN'}>Terminate</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>

@@ -1,3 +1,265 @@
+TaskNity.work_v1/
+├── .gitignore
+├── .idx/
+│   └── dev.nix
+├── Final_view.md
+├── README.md
+├── apphosting.yaml
+├── components.json
+├── database_schema.md
+├── docs/
+│   ├── ERROR_HANDLING.md
+│   ├── api-routes-listing.md
+│   └── blueprint.md
+├── endpoints.md
+├── fullCode.md
+├── next-env.d.ts
+├── next.config.ts
+├── overview_conn.md
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── prisma.config.ts
+├── prisma/
+│   ├── migrations/
+│   │   ├── 20251110104037_add_task_comment_relation/
+│   │   │   └── migration.sql
+│   │   └── migration_lock.toml
+│   └── schema.prisma
+├── src/
+│   ├── ai/
+│   │   ├── dev.ts
+│   │   └── genkit.ts
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx
+│   │   │   └── register/
+│   │   │       └── page.tsx
+│   │   ├── (dashboard)/
+│   │   │   ├── admin/
+│   │   │   │   ├── finance/
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── tabs/
+│   │   │   │   │       ├── AnalyticsTab.tsx
+│   │   │   │   │       ├── ExpenseTab.tsx
+│   │   │   │   │       └── InvoiceTab.tsx
+│   │   │   │   ├── notices/
+│   │   │   │   │   ├── create/
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── team/
+│   │   │   │       └── page.tsx
+│   │   │   ├── analytics/
+│   │   │   │   └── page.tsx
+│   │   │   ├── attendance/
+│   │   │   │   └── page.tsx
+│   │   │   ├── classified/
+│   │   │   │   └── page.tsx
+│   │   │   ├── expenses/
+│   │   │   │   ├── my-requests/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── leave-status/
+│   │   │   │   └── page.tsx
+│   │   │   ├── profile/
+│   │   │   │   ├── [userId]/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── projects/
+│   │   │   │   └── page.tsx
+│   │   │   └── tasks/
+│   │   │       └── page.tsx
+│   │   ├── api/
+│   │   │   ├── analytics/
+│   │   │   │   └── route.ts
+│   │   │   ├── attendance/
+│   │   │   │   ├── check-in/
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── check-out/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── auth/
+│   │   │   │   └── me/
+│   │   │   │       └── route.ts
+│   │   │   ├── dashboard/
+│   │   │   │   ├── route.ts
+│   │   │   │   └── stats/
+│   │   │   │       └── route.ts
+│   │   │   ├── expenses/
+│   │   │   │   ├── [expenseId]/
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── my-requests/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── files/
+│   │   │   │   ├── [fileId]/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── upload/
+│   │   │   │       └── route.ts
+│   │   │   ├── invoices/
+│   │   │   │   └── route.ts
+│   │   │   ├── leave/
+│   │   │   │   ├── [leaveId]/
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── my-requests/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── meeting/
+│   │   │   │   └── route.ts
+│   │   │   ├── notices/
+│   │   │   │   ├── [noticeId]/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── projects/
+│   │   │   │   ├── [projectId]/
+│   │   │   │   │   ├── members/
+│   │   │   │   │   │   ├── [memberId]/
+│   │   │   │   │   │   │   └── route.ts
+│   │   │   │   │   │   └── route.ts
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── reports/
+│   │   │   │   └── route.ts
+│   │   │   ├── tasks/
+│   │   │   │   ├── [taskId]/
+│   │   │   │   │   ├── assign/
+│   │   │   │   │   │   └── route.ts
+│   │   │   │   │   ├── comments/
+│   │   │   │   │   │   └── route.ts
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   ├── timesheet/
+│   │   │   │   └── route.ts
+│   │   │   ├── users/
+│   │   │   │   ├── [userId]/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   └── webhooks/
+│   │   │       └── clerk/
+│   │   │           ├── route.ts
+│   │   │           └── test-create/
+│   │   │               └── route.ts
+│   │   ├── error.tsx
+│   │   ├── favicon.ico
+│   │   ├── forbidden.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── not-found.tsx
+│   │   ├── page.tsx
+│   │   ├── rate-limit.tsx
+│   │   ├── server-error.tsx
+│   │   ├── test-admin/
+│   │   │   └── page.tsx
+│   │   └── test-me/
+│   │       └── page.tsx
+│   ├── components/
+│   │   ├── Navbar.tsx
+│   │   ├── admin/
+│   │   │   └── notices/
+│   │   │       ├── NoticeStats.tsx
+│   │   │       └── NoticeTable.tsx
+│   │   ├── expenses/
+│   │   │   ├── AnalyticsTab.tsx
+│   │   │   ├── ExpenseTab.tsx
+│   │   │   ├── InvoiceGenerator.tsx
+│   │   │   ├── InvoiceTab.tsx
+│   │   │   └── RevenueTab.tsx
+│   │   ├── kanban/
+│   │   │   ├── Board.tsx
+│   │   │   ├── KanbanColumn.tsx
+│   │   │   ├── Leaderboard.tsx
+│   │   │   ├── TaskCard.tsx
+│   │   │   └── TaskDetailsModal.tsx
+│   │   ├── layout/
+│   │   │   ├── LeaveRequestButton.tsx
+│   │   │   ├── OrgTree.tsx
+│   │   │   └── Sidebar.tsx
+│   │   ├── meeting/
+│   │   │   └── MeetingUI.tsx
+│   │   ├── profile/
+│   │   │   ├── AttendanceGraph.tsx
+│   │   │   ├── NoticeBoard.tsx
+│   │   │   └── UserProfileModal.tsx
+│   │   ├── providers/
+│   │   │   └── ApiErrorInterceptorInitializer.tsx
+│   │   ├── tasks/
+│   │   │   └── MultiAssign.tsx
+│   │   └── ui/
+│   │       ├── accordion.tsx
+│   │       ├── alert-dialog.tsx
+│   │       ├── alert.tsx
+│   │       ├── avatar.tsx
+│   │       ├── badge.tsx
+│   │       ├── button.tsx
+│   │       ├── calendar.tsx
+│   │       ├── card.tsx
+│   │       ├── carousel.tsx
+│   │       ├── chart.tsx
+│   │       ├── checkbox.tsx
+│   │       ├── collapsible.tsx
+│   │       ├── dialog.tsx
+│   │       ├── dropdown-menu.tsx
+│   │       ├── form.tsx
+│   │       ├── input.tsx
+│   │       ├── label.tsx
+│   │       ├── menubar.tsx
+│   │       ├── popover.tsx
+│   │       ├── progress.tsx
+│   │       ├── radio-group.tsx
+│   │       ├── scroll-area.tsx
+│   │       ├── select.tsx
+│   │       ├── separator.tsx
+│   │       ├── sheet.tsx
+│   │       ├── sidebar.tsx
+│   │       ├── skeleton.tsx
+│   │       ├── slider.tsx
+│   │       ├── switch.tsx
+│   │       ├── table.tsx
+│   │       ├── tabs.tsx
+│   │       ├── textarea.tsx
+│   │       ├── toast.tsx
+│   │       ├── toaster.tsx
+│   │       └── tooltip.tsx
+│   ├── context/
+│   │   └── AppContext.tsx
+│   ├── hooks/
+│   │   ├── use-mobile.tsx
+│   │   ├── use-toast.ts
+│   │   ├── useAdminNotices.ts
+│   │   ├── useCompanyFinance.ts
+│   │   └── useUsersData.ts
+│   ├── lib/
+│   │   ├── api-response.ts
+│   │   ├── apiClient.ts
+│   │   ├── auth.ts
+│   │   ├── db.ts
+│   │   ├── getCurrentDbUser.ts
+│   │   ├── permissionGuards.ts
+│   │   ├── placeholder-images.json
+│   │   ├── placeholder-images.ts
+│   │   ├── rbac.ts
+│   │   ├── requirePermission.ts
+│   │   ├── requireUser.ts
+│   │   ├── utils.ts
+│   │   └── withAuth.ts
+│   ├── middleware.ts
+│   ├── mock/
+│   │   └── data.ts
+│   ├── overview_conn.md
+│   ├── store/
+│   │   └── useFinanceStore.ts
+│   └── types/
+│       └── index.ts
+├── tailwind.config.ts
+└── tsconfig.json
+
+
+
+-----
+
+
+
 // prisma/schema.prisma
 generator client {
   provider        = "prisma-client-js"
@@ -15,6 +277,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  MANAGER
   MEMBER
   VIEWER
 }
@@ -160,10 +423,10 @@ model Project {
   members  ProjectMember[]
   tasks    Task[]
   invoices Invoice[]
-
+  expenses Expense[]       @relation("ProjectExpenses")
   // relation back to lead (optional)
-  leadId String?
-  lead   User?   @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  leadId   String?
+  lead     User?           @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
 
   @@map("projects")
 }
@@ -306,10 +569,14 @@ model Notice {
 // -----------------------------------------
 
 model Expense {
-  id          String          @id @default(uuid())
+  id          String  @id @default(uuid())
   userId      String
-  amount      Decimal         @db.Decimal(10, 2)
+  amount      Decimal @db.Decimal(10, 2)
   description String
+
+  projectId String?
+  project   Project? @relation("ProjectExpenses", fields: [projectId], references: [id], onDelete: SetNull)
+
   status      ExpenseStatus   @default(PENDING)
   submittedAt DateTime        @default(now())
   reviewedBy  String?
@@ -355,8 +622,6 @@ model AiLog {
 
   @@map("ai_logs")
 }
-
-
 
 
 ## src/app/api/auth/me/route.ts

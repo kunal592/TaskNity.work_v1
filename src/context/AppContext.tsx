@@ -8,6 +8,8 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
+  // Default role — can be overridden with NEXT_PUBLIC_DEFAULT_ROLE env var
+  const role = (process.env.NEXT_PUBLIC_DEFAULT_ROLE as string) || "Admin";
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -230,13 +232,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Normalize current user's role to consistent casing for RBAC checks
+  const normalizedRole = currentUser?.role
+    ? currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1).toLowerCase()
+    : undefined;
+
   const roleAccess = {
-    canManageProjects: currentUser?.role === "Admin",
-    canManageTasks: currentUser ? ["Admin", "Member"].includes(currentUser.role) : false,
-    canViewAnalytics: currentUser ? ["Admin", "Member", "Viewer"].includes(currentUser.role) : false,
-    canManageTeam: currentUser?.role === "Admin",
-    canMarkAttendance: currentUser ? ["Admin", "Member"].includes(currentUser.role) : false,
-    canManageExpenses: currentUser?.role === "Admin",
+    canManageProjects: normalizedRole === "Admin",
+    canManageTasks: normalizedRole ? ["Admin", "Member"].includes(normalizedRole) : false,
+    canViewAnalytics: normalizedRole ? ["Admin", "Member", "Viewer"].includes(normalizedRole) : false,
+    canManageTeam: normalizedRole === "Admin",
+    canMarkAttendance: normalizedRole ? ["Admin", "Member"].includes(normalizedRole) : false,
+    canManageExpenses: normalizedRole === "Admin",
   };
   
   const value: AppContextType = {

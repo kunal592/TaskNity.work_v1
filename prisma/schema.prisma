@@ -104,7 +104,9 @@ model User {
   team         String?
   isActive     Boolean  @default(true)
   avatarUrl    String?
-
+  salary   Decimal? @db.Decimal(10, 2)
+  github   String?
+  linkedin String?
   // Relations
   sessions         Session[]
   createdTasks     Task[]          @relation("CreatedTasks")
