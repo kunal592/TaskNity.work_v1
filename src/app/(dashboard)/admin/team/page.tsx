@@ -48,8 +48,7 @@ const initialNewUserState = {
 export default function TeamPage() {
   const { team, addTeamMember, deleteTeamMember, loading } = useTeamData();
   const { roleAccess } = useApp();
-  // note: user IDs are strings (UUIDs) in Prisma schema; modal expects a number in original code
-  // to avoid changing modal in this patch we'll store as string and cast when passing (recommended: update modal to accept string)
+
   const [profileUser, setProfileUser] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -73,6 +72,7 @@ export default function TeamPage() {
       toast.error('Please fill in all required fields (Name, Email, Role, Team).');
       return;
     }
+
     const payload: Partial<TeamUser> = {
       name: newUser.name,
       email: newUser.email,
@@ -80,7 +80,6 @@ export default function TeamPage() {
       team: newUser.team,
       phone: newUser.phone || undefined,
       address: newUser.address || undefined,
-      // salary/github/linkedin are UI-only for now (DB doesn't persist them). They will be merged into UI state after successful create.
       salary: newUser.salary ? Number(newUser.salary) : undefined,
       github: newUser.github || undefined,
       linkedin: newUser.linkedin || undefined,
@@ -102,7 +101,7 @@ export default function TeamPage() {
     const ok = await deleteTeamMember(userId);
     if (ok) toast.success('Employee terminated successfully!');
     else toast.error('Failed to terminate employee');
-  }
+  };
 
   const filteredUsers = team.filter((user) =>
     (user.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -112,15 +111,13 @@ export default function TeamPage() {
   return (
     <div className="p-6 space-y-6">
       {profileUser !== null && (
-        // NOTE: UserProfileModal originally typed userId as number.
-        // Since Prisma uses string UUIDs for ids, a clean long-term fix is to update UserProfileModal to accept string | number.
-        // To avoid changing other files in this PR we cast here for TS compatibility.
         <UserProfileModal
           open={profileUser !== null}
           onClose={() => setProfileUser(null)}
           userId={profileUser as unknown as number}
         />
       )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Team Management</h1>
         <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
@@ -132,76 +129,93 @@ export default function TeamPage() {
               <DialogTitle>Add New Employee</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Name</Label>
                 <Input id="name" value={newUser.name} onChange={handleInputChange} className="col-span-3" />
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email" className="text-right">Email</Label>
                 <Input id="email" type="email" value={newUser.email} onChange={handleInputChange} className="col-span-3" />
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
+
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="phone" className="text-right">Cell No.</Label>
                 <Input id="phone" type="tel" value={newUser.phone} onChange={handleInputChange} className="col-span-3" />
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="salary" className="text-right">Salary (₹)</Label>
                 <Input id="salary" type="number" value={newUser.salary} onChange={handleInputChange} className="col-span-3" />
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">Role</Label>
-                 <Select value={newUser.role} onValueChange={(value: TeamUser['role']) => handleSelectChange('role', value)}>
-                    <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ADMIN">Admin</SelectItem>
-                        <SelectItem value="MANAGER">Manager</SelectItem>
-                        <SelectItem value="MEMBER">Member</SelectItem>
-                        <SelectItem value="VIEWER">Viewer</SelectItem>
-                    </SelectContent>
+                <Select
+                  value={newUser.role}
+                  onValueChange={(value: string) => handleSelectChange('role', value)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="MANAGER">Manager</SelectItem>
+                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="VIEWER">Viewer</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="team" className="text-right">Team</Label>
-                 <Select value={newUser.team} onValueChange={(value) => handleSelectChange('team', value)}>
-                    <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select Team" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Core">Core</SelectItem>
-                        <SelectItem value="Frontend">Frontend</SelectItem>
-                        <SelectItem value="Backend">Backend</SelectItem>
-                        <SelectItem value="Design">Design</SelectItem>
-                        <SelectItem value="HR">HR</SelectItem>
-                        <SelectItem value="Sales">Sales</SelectItem>
-                        <SelectItem value="Marketing">Marketing</SelectItem>
-                    </SelectContent>
+                <Select
+                  value={newUser.team}
+                  onValueChange={(value) => handleSelectChange('team', value)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select Team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Core">Core</SelectItem>
+                    <SelectItem value="Frontend">Frontend</SelectItem>
+                    <SelectItem value="Backend">Backend</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="HR">HR</SelectItem>
+                    <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
 
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="avatarUrl" className="text-right">Avatar URL</Label>
-                <Input id="avatarUrl" value={newUser.avatarUrl} onChange={handleInputChange} className="col-span-3" placeholder="https://example.com/avatar.jpg" />
+                <Input id="avatarUrl" value={newUser.avatarUrl} onChange={handleInputChange} className="col-span-3" />
               </div>
 
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="address" className="text-right">Address</Label>
                 <Textarea id="address" value={newUser.address} onChange={handleInputChange} className="col-span-3" />
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="github" className="text-right">GitHub</Label>
                 <Input id="github" value={newUser.github} onChange={handleInputChange} className="col-span-3" placeholder="Optional" />
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="linkedin" className="text-right">LinkedIn</Label>
                 <Input id="linkedin" value={newUser.linkedin} onChange={handleInputChange} className="col-span-3" placeholder="Optional" />
               </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="joined" className="text-right">Joined Date</Label>
                 <Input id="joined" type="date" value={newUser.joined} onChange={handleInputChange} className="col-span-3" />
               </div>
+
             </div>
+
             <DialogFooter>
               <Button onClick={handleAddUser} disabled={loading}>Add Employee</Button>
             </DialogFooter>
@@ -215,7 +229,7 @@ export default function TeamPage() {
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-sm"
       />
-      
+
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -231,61 +245,72 @@ export default function TeamPage() {
                   <th className="p-3 text-left">Actions</th>
                 </tr>
               </thead>
+
               <tbody>
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="p-3">
-                      <div
-                        className="flex items-center gap-3 cursor-pointer"
-                        onClick={() => setProfileUser(user.id)}
-                      >
-                        <Avatar>
-                          <AvatarImage src={user.avatarUrl ?? undefined} alt={user.name ?? ''} />
-                          <AvatarFallback>
-                            {(user.name ?? '').split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium hover:underline">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                {filteredUsers.map((user) => {
+
+                  return (
+                    <tr key={user.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="p-3">
+                        <div
+                          className="flex items-center gap-3 cursor-pointer"
+                          onClick={() => setProfileUser(user.id)}
+                        >
+                          <Avatar>
+                            <AvatarImage src={user.avatarUrl ?? undefined} alt={user.name ?? ''} />
+                            <AvatarFallback>
+                              {(user.name ?? '').split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium hover:underline">{user.name}</p>
+                            <p className="text-xs text-muted-foreground">{user.email}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-3">{user.role}</td>
-                    <td className="p-3">{user.team}</td>
-                    <td className="p-3">₹{(user.salary ?? '—').toString()}</td>
-                    <td className="p-3">{user.joined ?? '—'}</td>
-                    <td className="p-3">
-                      {user.tasks && user.tasks.length > 0 ? (
-                        `${user.tasks.filter(t => t.status === "completed").length}/${user.tasks.length} completed`
-                      ) : (
-                        "No tasks"
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                           <Button variant="destructive" size="sm" disabled={user.role === 'ADMIN'}>Terminate</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently remove {user.name} from the team.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleTerminate(user.id)}>
-                              Confirm
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      <td className="p-3">{user.role}</td>
+                      <td className="p-3">{user.team}</td>
+                      <td className="p-3">₹{(user.salary ?? '—').toString()}</td>
+                      <td className="p-3">{user.joined ?? '—'}</td>
+
+                      <td className="p-3">
+                        {user.tasks && user.tasks.length > 0
+                          ? `${user.tasks.filter(t => t.status === "completed").length}/${user.tasks.length} completed`
+                          : "No tasks"}
+                      </td>
+
+                      <td className="p-3">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" disabled={user.role === 'ADMIN'}>
+                              Terminate
+                            </Button>
+                          </AlertDialogTrigger>
+
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently remove {user.name} from the team.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+                              <AlertDialogAction onClick={() => handleTerminate(user.id)}>
+                                Confirm
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
+
             </table>
           </div>
         </CardContent>

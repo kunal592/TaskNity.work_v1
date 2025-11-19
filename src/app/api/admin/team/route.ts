@@ -5,18 +5,19 @@ import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/requirePermission";
 
 /**
- * Helper to normalize role strings from frontend ("Admin", "Member", etc.)
- * to Prisma enum values (ADMIN, MANAGER, MEMBER, VIEWER)
+ * Normalize role input from frontend to Prisma enum
  */
 function normalizeRole(role?: string) {
   if (!role) return "MEMBER";
   const r = role.toString().toUpperCase();
-  if (r === "ADMIN") return "ADMIN";
-  if (r === "MANAGER") return "MANAGER";
-  if (r === "VIEWER") return "VIEWER";
+
+  if (["ADMIN", "MANAGER", "VIEWER", "MEMBER"].includes(r)) return r;
   return "MEMBER";
 }
 
+// -----------------------------------------------------------
+// GET — List all employees
+// -----------------------------------------------------------
 export const GET = withAuth(async (req: Request) => {
   await requirePermission(req, "user:read");
 
@@ -34,27 +35,41 @@ export const GET = withAuth(async (req: Request) => {
       address: true,
       avatarUrl: true,
       isActive: true,
+      salary: true,
+      github: true,
+      linkedin: true,
     },
   });
 
-  // Map DB fields to simpler frontend-friendly shape
-  const mapped = users.map(u => ({
+  const mapped = users.map((u) => ({
     id: u.id,
     clerkId: u.clerkId,
     email: u.email,
     name: u.name,
     role: u.role,
     joined: u.joinedAt?.toISOString().split("T")[0] ?? null,
-    team: u.team,
+    team: u.team ?? null,
     phone: u.phone,
     address: u.address,
     avatarUrl: u.avatarUrl,
     isActive: u.isActive,
+
+    // Ensure safe types for frontend
+    salary: u.salary ? Number(u.salary) : null,
+    github: u.github ?? null,
+    linkedin: u.linkedin ?? null,
+
+    // Team page expects this field even if empty
+    tasks: [],
   }));
+console.log("API TEAM ROUTE RUNNING");
 
   return new Response(JSON.stringify({ users: mapped }), { status: 200 });
 });
 
+// -----------------------------------------------------------
+// POST — Create new employee
+// -----------------------------------------------------------
 export const POST = withAuth(async (req: Request) => {
   await requirePermission(req, "user:create");
 
@@ -67,38 +82,38 @@ export const POST = withAuth(async (req: Request) => {
     address,
     team,
     avatarUrl,
+    joined,
+    salary,
     github,
     linkedin,
-    joined,
   } = body ?? {};
 
   if (!email || !name || !role) {
-    return new Response(JSON.stringify({ error: "Missing required fields (email, name, role)" }), { status: 400 });
+    return new Response(
+      JSON.stringify({ error: "Missing required fields (email, name, role)" }),
+      { status: 400 }
+    );
   }
 
-  // create clerk user (like existing /api/users route)
+  const normalizedRole = normalizeRole(role);
+
+  // Create Clerk user (optional)
   let clerkUserId: string | undefined = undefined;
   try {
-    const clerk = await (clerkClient as any)();
-    if (clerk && clerk.users) {
-      const created = await clerk.users.createUser({
-        emailAddress: [email],
-        firstName: name,
-        publicMetadata: { role },
-      });
-      clerkUserId = created?.id;
-    }
+    const clerk = await clerkClient();
+    const created = await clerk.users.createUser({
+      emailAddress: [email],
+      firstName: name,
+      publicMetadata: { role: normalizedRole },
+    });
+    clerkUserId = created.id;
   } catch (e) {
-    // don't fail completely if clerk create fails; still create DB user
     console.warn("Clerk user creation failed:", e);
   }
 
-  // Normalize role to Prisma enum
-  const normalizedRole = normalizeRole(role);
-
-  // Build create payload (only fields that exist in Prisma User model)
+  // Build Prisma payload
   const createData: any = {
-    clerkId: clerkUserId ?? undefined,
+    clerkId: clerkUserId,
     email,
     name,
     role: normalizedRole,
@@ -107,17 +122,18 @@ export const POST = withAuth(async (req: Request) => {
     address: address ?? null,
     avatarUrl: avatarUrl ?? null,
     isActive: true,
+    salary: salary ? Number(salary) : null,
+    github: github ?? null,
+    linkedin: linkedin ?? null,
   };
 
+  // Optional joined date
   if (joined) {
     try {
       createData.joinedAt = new Date(joined);
-    } catch (e) {
-      // ignore invalid date; fallback to now
-    }
+    } catch (_e) {}
   }
 
-  // Note: schema.prisma does not have `salary`, `github`, `linkedin` fields on User
   const newUser = await prisma.user.create({
     data: createData,
     select: {
@@ -130,7 +146,10 @@ export const POST = withAuth(async (req: Request) => {
       address: true,
       avatarUrl: true,
       joinedAt: true,
-    }
+      salary: true,
+      github: true,
+      linkedin: true,
+    },
   });
 
   const mapped = {
@@ -143,33 +162,47 @@ export const POST = withAuth(async (req: Request) => {
     address: newUser.address,
     avatarUrl: newUser.avatarUrl,
     joined: newUser.joinedAt?.toISOString().split("T")[0] ?? null,
+    salary: newUser.salary ? Number(newUser.salary) : null,
+    github: newUser.github ?? null,
+    linkedin: newUser.linkedin ?? null,
+    tasks: [],
   };
 
   return new Response(JSON.stringify({ user: mapped }), { status: 201 });
 });
 
+// -----------------------------------------------------------
+// DELETE — Remove user
+// -----------------------------------------------------------
 export const DELETE = withAuth(async (req: Request) => {
   await requirePermission(req, "user:delete");
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
+
   if (!id) {
-    return new Response(JSON.stringify({ error: "Missing id query parameter" }), { status: 400 });
+    return new Response(
+      JSON.stringify({ error: "Missing id query parameter" }),
+      { status: 400 }
+    );
   }
 
-  // fetch user to also remove clerk account if present
   const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) return new Response(JSON.stringify({ error: "User not found" }), { status: 404 });
+  if (!user) {
+    return new Response(JSON.stringify({ error: "User not found" }), {
+      status: 404,
+    });
+  }
 
-  // attempt to delete Clerk user if linked
+  // Delete Clerk user if exists
   if (user.clerkId) {
     try {
-      const clerk = await (clerkClient as any)();
-      if (clerk && clerk.users && typeof clerk.users.deleteUser === 'function') {
+      const clerk = await clerkClient();
+      if (clerk.users && typeof clerk.users.deleteUser === "function") {
         await clerk.users.deleteUser(user.clerkId);
       }
     } catch (e) {
-      console.warn("Failed to delete clerk user:", e);
+      console.warn("Failed to delete Clerk user:", e);
     }
   }
 
